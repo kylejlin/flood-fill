@@ -27,6 +27,8 @@ export default class App extends React.Component<{}, State> {
     this.state = {
       originalImg: Option.none(),
       fileName: Option.none(),
+      shouldBackdropBeCheckered: true,
+      backdropColorHex: "#222222",
       history: Option.none(),
       replacementColor: Option.none(),
       toleranceStr: "0",
@@ -50,6 +52,12 @@ export default class App extends React.Component<{}, State> {
     );
     this.onUndoClick = this.onUndoClick.bind(this);
     this.onRedoClick = this.onRedoClick.bind(this);
+    this.onBackdropColorChangeComplete = this.onBackdropColorChangeComplete.bind(
+      this
+    );
+    this.onShouldBackdropBeCheckeredChange = this.onShouldBackdropBeCheckeredChange.bind(
+      this
+    );
   }
 
   render() {
@@ -86,6 +94,29 @@ export default class App extends React.Component<{}, State> {
                     onChangeComplete={this.onReplacementColorChangeComplete}
                   />
                 </label>
+
+                <section>
+                  <h3>Backdrop</h3>
+                  <label>
+                    Use checkerboard:{" "}
+                    <input
+                      type="checkbox"
+                      checked={this.state.shouldBackdropBeCheckered}
+                      onChange={this.onShouldBackdropBeCheckeredChange}
+                    />
+                    {!this.state.shouldBackdropBeCheckered && (
+                      <label>
+                        Color:
+                        <SketchPicker
+                          disableAlpha
+                          color={this.state.backdropColorHex}
+                          onChangeComplete={this.onBackdropColorChangeComplete}
+                        />
+                      </label>
+                    )}
+                  </label>
+                </section>
+
                 <label>
                   Tolerance:{" "}
                   <input
@@ -111,7 +142,21 @@ export default class App extends React.Component<{}, State> {
             .match({
               none: () => null,
               some: imgData => (
-                <div className="MainCanvasContainer">
+                <div
+                  className={
+                    "MainCanvasContainer" +
+                    (this.state.shouldBackdropBeCheckered
+                      ? " Checkerboard"
+                      : "")
+                  }
+                  {...(this.state.shouldBackdropBeCheckered
+                    ? {}
+                    : {
+                        style: {
+                          backgroundColor: this.state.backdropColorHex
+                        }
+                      })}
+                >
                   <Canvas
                     imgData={imgData}
                     canvasRef={this.mainCanvasRef}
@@ -267,11 +312,23 @@ export default class App extends React.Component<{}, State> {
       .redo();
     this.forceUpdate();
   }
+
+  onBackdropColorChangeComplete(color: ColorResult) {
+    this.setState({ backdropColorHex: color.hex });
+  }
+
+  onShouldBackdropBeCheckeredChange(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    this.setState({ shouldBackdropBeCheckered: event.target.checked });
+  }
 }
 
 interface State {
   originalImg: Option<HTMLImageElement>;
   fileName: Option<string>;
+  shouldBackdropBeCheckered: boolean;
+  backdropColorHex: string;
   history: Option<History<ImageData>>;
   replacementColor: Option<RGBColor>;
   toleranceStr: string;
