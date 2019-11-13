@@ -19,10 +19,23 @@
   cursor: crosshair;
 }
 
+.Snapshots {
+  --snapshot-height: 15vh;
+  width: 100vw;
+  /* height: var(--snapshot-height); */
+  overflow: auto;
+  display: inline-block;
+  white-space: nowrap;
+}
+
 .HistorySnapshot {
-  height: 15vh;
+  height: var(--snapshot-height);
 }
 
 .NonFinalSnapshot {
   margin-right: 10px;
+}
+
+.CurrentSnapshot {
+  border: 5px dashed #08b;
 }

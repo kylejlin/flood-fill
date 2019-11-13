@@ -17,6 +17,8 @@ import {
 
 export default class App extends React.Component<{}, State> {
   private mainCanvasRef: React.RefObject<HTMLCanvasElement>;
+  private snapshotsRef: React.RefObject<HTMLDivElement>;
+  private currentSnapshotRef: React.RefObject<HTMLCanvasElement>;
 
   constructor(props: {}) {
     super(props);
@@ -38,6 +40,8 @@ export default class App extends React.Component<{}, State> {
     this.bindMethods();
 
     this.mainCanvasRef = React.createRef();
+    this.snapshotsRef = React.createRef();
+    this.currentSnapshotRef = React.createRef();
   }
 
   bindMethods() {
@@ -80,15 +84,13 @@ export default class App extends React.Component<{}, State> {
       if (event.shiftKey) {
         this.state.history.ifSome(history => {
           if (history.canRedo()) {
-            history.redo();
-            this.forceUpdate();
+            this.redo();
           }
         });
       } else {
         this.state.history.ifSome(history => {
           if (history.canUndo()) {
-            history.undo();
-            this.forceUpdate();
+            this.undo();
           }
         });
       }
@@ -207,51 +209,60 @@ export default class App extends React.Component<{}, State> {
             some: history => (
               <div>
                 <h3>History</h3>
-                <div>
-                  <h4>Past</h4>
 
-                  <button
-                    onClick={this.onUndoClick}
-                    disabled={!history.canUndo()}
-                  >
-                    Undo
-                  </button>
+                <button
+                  onClick={this.onUndoClick}
+                  disabled={!history.canUndo()}
+                >
+                  Undo
+                </button>
 
-                  <div>
-                    {history.past().map((imgData, i, { length }) => (
+                <button
+                  onClick={this.onRedoClick}
+                  disabled={!history.canRedo()}
+                >
+                  Redo
+                </button>
+
+                <p>
+                  You can also Undo by pressing <kbd>Ctrl-Z</kbd> or{" "}
+                  <kbd>Cmd-Z</kbd> and Redo by pressing <kbd>Ctrl-Shift-Z</kbd>{" "}
+                  or <kbd>Cmd-Shift-Z</kbd>.
+                </p>
+
+                <div className="Snapshots" ref={this.snapshotsRef}>
+                  {history.past().map((imgData, i) => (
+                    <Canvas
+                      key={i}
+                      imgData={imgData}
+                      className="HistorySnapshot NonFinalSnapshot"
+                    />
+                  ))}
+                  {history.current().match({
+                    none: () => null,
+                    some: imgData => (
                       <Canvas
-                        key={i}
                         imgData={imgData}
                         className={
-                          "HistorySnapshot" +
-                          (i < length - 1 ? " NonFinalSnapshot" : "")
+                          "HistorySnapshot CurrentSnapshot" +
+                          (history.future().length > 0
+                            ? " NonFinalSnapshot"
+                            : "")
                         }
+                        canvasRef={this.currentSnapshotRef}
                       />
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <h4>Future</h4>
-
-                  <button
-                    onClick={this.onRedoClick}
-                    disabled={!history.canRedo()}
-                  >
-                    Redo
-                  </button>
-
-                  <div>
-                    {history.future().map((imgData, i, { length }) => (
-                      <Canvas
-                        key={i}
-                        imgData={imgData}
-                        className={
-                          "HistorySnapshot" +
-                          (i < length - 1 ? " NonFinalSnapshot" : "")
-                        }
-                      />
-                    ))}
-                  </div>
+                    )
+                  })}
+                  {history.future().map((imgData, i, { length }) => (
+                    <Canvas
+                      key={i}
+                      imgData={imgData}
+                      className={
+                        "HistorySnapshot" +
+                        (i < length - 1 ? " NonFinalSnapshot" : "")
+                      }
+                    />
+                  ))}
                 </div>
               </div>
             )
@@ -335,17 +346,29 @@ export default class App extends React.Component<{}, State> {
   }
 
   onUndoClick() {
+    this.undo();
+  }
+
+  undo() {
     this.state.history
       .expect("Cannot call onUndoClick if history is none")
       .undo();
-    this.forceUpdate();
+    this.forceUpdate(() => {
+      this.scrollHistoryToCurrentSnapshot();
+    });
   }
 
   onRedoClick() {
+    this.redo();
+  }
+
+  redo() {
     this.state.history
       .expect("Cannot call onRedoClick if history is none")
       .redo();
-    this.forceUpdate();
+    this.forceUpdate(() => {
+      this.scrollHistoryToCurrentSnapshot();
+    });
   }
 
   onBackdropColorChangeComplete(color: ColorResult) {
@@ -356,6 +379,23 @@ export default class App extends React.Component<{}, State> {
     event: React.ChangeEvent<HTMLInputElement>
   ) {
     this.setState({ shouldBackdropBeCheckered: event.target.checked });
+  }
+
+  scrollHistoryToCurrentSnapshot() {
+    const currentSnapshot = this.currentSnapshotRef.current;
+    if (currentSnapshot !== null) {
+      const snapshotsContainer = this.snapshotsRef.current!;
+      const snapshotsContainerWidth = snapshotsContainer.getBoundingClientRect()
+        .width;
+      const currentSnapshotRight = currentSnapshot.getBoundingClientRect()
+        .right;
+      snapshotsContainer.scroll(
+        currentSnapshotRight +
+          snapshotsContainer.scrollLeft -
+          snapshotsContainerWidth,
+        0
+      );
+    }
   }
 }
 
