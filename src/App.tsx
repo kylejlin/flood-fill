@@ -41,6 +41,8 @@ export default class App extends React.Component<{}, State> {
   }
 
   bindMethods() {
+    this.onKeyDown = this.onKeyDown.bind(this);
+
     this.onFileChange = this.onFileChange.bind(this);
     this.onReplacementColorChangeComplete = this.onReplacementColorChangeComplete.bind(
       this
@@ -58,6 +60,39 @@ export default class App extends React.Component<{}, State> {
     this.onShouldBackdropBeCheckeredChange = this.onShouldBackdropBeCheckeredChange.bind(
       this
     );
+  }
+
+  componentDidMount() {
+    window.addEventListener("keydown", this.onKeyDown);
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener("keydown", this.onKeyDown);
+  }
+
+  onKeyDown(event: KeyboardEvent) {
+    if (
+      document.activeElement === document.body &&
+      event.key.toLowerCase() === "z" &&
+      (event.ctrlKey || event.metaKey)
+    ) {
+      event.preventDefault();
+      if (event.shiftKey) {
+        this.state.history.ifSome(history => {
+          if (history.canRedo()) {
+            history.redo();
+            this.forceUpdate();
+          }
+        });
+      } else {
+        this.state.history.ifSome(history => {
+          if (history.canUndo()) {
+            history.undo();
+            this.forceUpdate();
+          }
+        });
+      }
+    }
   }
 
   render() {
