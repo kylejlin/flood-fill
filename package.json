@@ -2,6 +2,7 @@
   "name": "flood-fill",
   "version": "0.1.0",
   "private": true,
+  "homepage": "https://kylejlin.github.io/flood-fill",
   "dependencies": {
     "@kylejlin/option": "^1.0.0",
     "@types/jest": "24.0.22",
@@ -18,7 +19,9 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build"
   },
   "eslintConfig": {
     "extends": "react-app"
@@ -37,6 +40,7 @@
   },
   "devDependencies": {
     "@types/react-color": "^3.0.1",
+    "gh-pages": "^2.1.1",
     "prettier": "^1.19.1"
   }
 }
