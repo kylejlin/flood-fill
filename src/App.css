@@ -1,8 +1,16 @@
-.CanvasContainer {
+.MainCanvasContainer {
   width: 100vw;
   overflow: auto;
 }
 
-canvas {
+.MainCanvas {
   cursor: crosshair;
+}
+
+.HistorySnapshot {
+  height: 15vh;
+}
+
+.NonFinalSnapshot {
+  margin-right: 10px;
 }

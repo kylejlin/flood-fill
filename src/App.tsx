@@ -4,10 +4,12 @@ import { SketchPicker, ColorResult, RGBColor } from "react-color";
 
 import "./App.css";
 
+import Canvas from "./components/Canvas";
+
 import readFileAsHtmlImage from "./readFileAsHtmlImage";
 
 export default class App extends React.Component<{}, State> {
-  private canvasRef: React.RefObject<HTMLCanvasElement>;
+  private mainCanvasRef: React.RefObject<HTMLCanvasElement>;
 
   constructor(props: {}) {
     super(props);
@@ -18,14 +20,15 @@ export default class App extends React.Component<{}, State> {
     this.state = {
       originalImg: Option.none(),
       fileName: Option.none(),
+      history: Option.none(),
       replacementColor: Option.none(),
       toleranceStr: "0",
       shouldCompareAlpha: false
     };
 
-    this.canvasRef = React.createRef();
-
     this.bindMethods();
+
+    this.mainCanvasRef = React.createRef();
   }
 
   bindMethods() {
@@ -38,6 +41,8 @@ export default class App extends React.Component<{}, State> {
     this.onShouldCompareAlphaChange = this.onShouldCompareAlphaChange.bind(
       this
     );
+    this.onUndoClick = this.onUndoClick.bind(this);
+    this.onRedoClick = this.onRedoClick.bind(this);
   }
 
   render() {
@@ -94,9 +99,76 @@ export default class App extends React.Component<{}, State> {
             )
           })}
 
-          <div className="CanvasContainer">
-            <canvas ref={this.canvasRef} onClick={this.onCanvasClick} />
-          </div>
+          {this.state.history
+            .andThen(history => history.current())
+            .match({
+              none: () => null,
+              some: imgData => (
+                <div className="MainCanvasContainer">
+                  <Canvas
+                    imgData={imgData}
+                    canvasRef={this.mainCanvasRef}
+                    className={"MainCanvas"}
+                    onClick={this.onCanvasClick}
+                  />
+                </div>
+              )
+            })}
+
+          {this.state.history.match({
+            none: () => null,
+            some: history => (
+              <div>
+                <h3>History</h3>
+                <div>
+                  <h4>Past</h4>
+
+                  <button
+                    onClick={this.onUndoClick}
+                    disabled={!history.canUndo()}
+                  >
+                    Undo
+                  </button>
+
+                  <div>
+                    {history.past().map((imgData, i, { length }) => (
+                      <Canvas
+                        key={i}
+                        imgData={imgData}
+                        className={
+                          "HistorySnapshot" +
+                          (i < length - 1 ? " NonFinalSnapshot" : "")
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h4>Future</h4>
+
+                  <button
+                    onClick={this.onRedoClick}
+                    disabled={!history.canRedo()}
+                  >
+                    Redo
+                  </button>
+
+                  <div>
+                    {history.future().map((imgData, i, { length }) => (
+                      <Canvas
+                        key={i}
+                        imgData={imgData}
+                        className={
+                          "HistorySnapshot" +
+                          (i < length - 1 ? " NonFinalSnapshot" : "")
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </main>
       </>
     );
@@ -108,15 +180,12 @@ export default class App extends React.Component<{}, State> {
       const file = files[0];
       if (file instanceof File && /\.(jpe?g|png|gif)$/i.test(file.name)) {
         readFileAsHtmlImage(file).then(img => {
-          const canvas = this.canvasRef.current!;
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext("2d")!;
-          ctx.drawImage(img, 0, 0);
+          const imgData = getImgData(img);
 
           this.setState({
             originalImg: Option.some(img),
             fileName: Option.some(file.name),
+            history: Option.some(History.fromCurrent(imgData)),
             replacementColor: Option.some({ r: 0, g: 0, b: 0, a: 0 })
           });
         });
@@ -129,27 +198,44 @@ export default class App extends React.Component<{}, State> {
   }
 
   onCanvasClick(event: React.MouseEvent<HTMLCanvasElement>) {
-    this.state.replacementColor.ifSome(replacementColor => {
+    Option.all([
+      this.state.replacementColor,
+      this.state.history,
+      this.state.history.andThen(history => history.current())
+    ]).ifSome(([replacementColor, history, currentImgData]) => {
       const { clientX, clientY } = event;
-      const canvas = this.canvasRef.current!;
-      const ctx = canvas.getContext("2d")!;
-      const dataBefore = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const canvas = this.mainCanvasRef.current!;
+      const dataBefore = currentImgData;
 
       const box = canvas.getBoundingClientRect();
       const localX = Math.round(clientX - box.left);
       const localY = Math.round(clientY - box.top);
+      const location = { x: localX, y: localY };
+
+      if (
+        doesTargetColorEqualReplacementColor(
+          dataBefore,
+          location,
+          replacementColor
+        )
+      ) {
+        return;
+      }
+
+      const options = {
+        tolerance: parseInt(this.state.toleranceStr, 10),
+        shouldCompareAlpha: this.state.shouldCompareAlpha
+      };
 
       const dataAfter = getImgDataAfterFloodFill(
         dataBefore,
-        { x: localX, y: localY },
+        location,
         replacementColor,
-        {
-          tolerance: parseInt(this.state.toleranceStr, 10),
-          shouldCompareAlpha: this.state.shouldCompareAlpha
-        }
+        options
       );
 
-      canvas.getContext("2d")!.putImageData(dataAfter, 0, 0);
+      history.push(dataAfter);
+      this.forceUpdate();
     });
   }
 
@@ -160,11 +246,26 @@ export default class App extends React.Component<{}, State> {
   onShouldCompareAlphaChange(event: React.ChangeEvent<HTMLInputElement>) {
     this.setState({ shouldCompareAlpha: event.target.checked });
   }
+
+  onUndoClick() {
+    this.state.history
+      .expect("Cannot call onUndoClick if history is none")
+      .undo();
+    this.forceUpdate();
+  }
+
+  onRedoClick() {
+    this.state.history
+      .expect("Cannot call onRedoClick if history is none")
+      .redo();
+    this.forceUpdate();
+  }
 }
 
 interface State {
   originalImg: Option<HTMLImageElement>;
   fileName: Option<string>;
+  history: Option<History<ImageData>>;
   replacementColor: Option<RGBColor>;
   toleranceStr: string;
   shouldCompareAlpha: boolean;
@@ -213,6 +314,94 @@ class Queue<T> {
   hasItem(): boolean {
     return this.dequeueIndex < this.data.length;
   }
+}
+
+class History<T> {
+  private undoStack: T[];
+  private redoStack: T[];
+
+  static fromCurrent<T>(current: T): History<T> {
+    const history: History<T> = History.empty();
+    history.push(current);
+    return history;
+  }
+
+  static empty<T>(): History<T> {
+    return new History();
+  }
+
+  private constructor() {
+    this.undoStack = [];
+    this.redoStack = [];
+  }
+
+  undo(): T {
+    if (!this.canUndo()) {
+      throw new Error("Cannot undo nothing.");
+    }
+
+    const undone = this.undoStack.pop()!;
+    this.redoStack.push(undone);
+    return undone;
+  }
+
+  canUndo(): boolean {
+    return this.undoStack.length > 1;
+  }
+
+  redo(): T {
+    if (!this.canRedo()) {
+      throw new Error("Cannot redo nothing.");
+    }
+
+    const redone = this.redoStack.pop()!;
+    this.undoStack.push(redone);
+    return redone;
+  }
+
+  canRedo(): boolean {
+    return this.redoStack.length > 0;
+  }
+
+  push(item: T) {
+    this.undoStack.push(item);
+    this.redoStack = [];
+  }
+
+  current(): Option<T> {
+    if (this.undoStack.length === 0) {
+      return Option.none();
+    } else {
+      return Option.some(this.undoStack[this.undoStack.length - 1]);
+    }
+  }
+
+  past(): T[] {
+    return this.undoStack.slice(0, -1);
+  }
+
+  future(): T[] {
+    return this.redoStack.slice().reverse();
+  }
+}
+
+function getImgData(img: HTMLImageElement): ImageData {
+  const canvas = document.createElement("canvas");
+  canvas.width = img.width;
+  canvas.height = img.height;
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(img, 0, 0);
+  return ctx.getImageData(0, 0, canvas.width, canvas.height);
+}
+
+function doesTargetColorEqualReplacementColor(
+  imgData: ImageData,
+  floodStartLocation: { x: number; y: number },
+  replacementRgbColor: RGBColor
+): boolean {
+  const replacementColor = getRgbaU8FromRgb(replacementRgbColor);
+  const targetColor = getPixelColorAt(imgData, floodStartLocation);
+  return areColorsEqual(replacementColor, targetColor);
 }
 
 function getImgDataAfterFloodFill(
