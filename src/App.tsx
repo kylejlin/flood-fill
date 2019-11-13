@@ -18,7 +18,9 @@ export default class App extends React.Component<{}, State> {
     this.state = {
       originalImg: Option.none(),
       fileName: Option.none(),
-      replacementColor: Option.none()
+      replacementColor: Option.none(),
+      toleranceStr: "0",
+      shouldCompareAlpha: false
     };
 
     this.canvasRef = React.createRef();
@@ -32,6 +34,10 @@ export default class App extends React.Component<{}, State> {
       this
     );
     this.onCanvasClick = this.onCanvasClick.bind(this);
+    this.onToleranceChange = this.onToleranceChange.bind(this);
+    this.onShouldCompareAlphaChange = this.onShouldCompareAlphaChange.bind(
+      this
+    );
   }
 
   render() {
@@ -61,11 +67,29 @@ export default class App extends React.Component<{}, State> {
             none: () => null,
             some: color => (
               <div>
-                <label>Replacement color:</label>
-                <SketchPicker
-                  color={color}
-                  onChangeComplete={this.onReplacementColorChangeComplete}
-                />
+                <label>
+                  Replacement color:
+                  <SketchPicker
+                    color={color}
+                    onChangeComplete={this.onReplacementColorChangeComplete}
+                  />
+                </label>
+                <label>
+                  Tolerance:{" "}
+                  <input
+                    type="number"
+                    value={this.state.toleranceStr}
+                    onChange={this.onToleranceChange}
+                  />
+                </label>
+                <label>
+                  Compare alpha values:{" "}
+                  <input
+                    type="checkbox"
+                    checked={this.state.shouldCompareAlpha}
+                    onChange={this.onShouldCompareAlphaChange}
+                  />
+                </label>
               </div>
             )
           })}
@@ -118,11 +142,23 @@ export default class App extends React.Component<{}, State> {
       const dataAfter = getImgDataAfterFloodFill(
         dataBefore,
         { x: localX, y: localY },
-        replacementColor
+        replacementColor,
+        {
+          tolerance: parseInt(this.state.toleranceStr, 10),
+          shouldCompareAlpha: this.state.shouldCompareAlpha
+        }
       );
 
       canvas.getContext("2d")!.putImageData(dataAfter, 0, 0);
     });
+  }
+
+  onToleranceChange(event: React.ChangeEvent<HTMLInputElement>) {
+    this.setState({ toleranceStr: event.target.value });
+  }
+
+  onShouldCompareAlphaChange(event: React.ChangeEvent<HTMLInputElement>) {
+    this.setState({ shouldCompareAlpha: event.target.checked });
   }
 }
 
@@ -130,6 +166,8 @@ interface State {
   originalImg: Option<HTMLImageElement>;
   fileName: Option<string>;
   replacementColor: Option<RGBColor>;
+  toleranceStr: string;
+  shouldCompareAlpha: boolean;
 }
 
 interface RgbaU8 {
@@ -137,6 +175,11 @@ interface RgbaU8 {
   b: number;
   g: number;
   a: number;
+}
+
+interface ColorComparisonOptions {
+  tolerance: number;
+  shouldCompareAlpha: boolean;
 }
 
 class Queue<T> {
@@ -175,11 +218,13 @@ class Queue<T> {
 function getImgDataAfterFloodFill(
   originalData: ImageData,
   floodStartLocation: { x: number; y: number },
-  replacementRgbColor: RGBColor
+  replacementRgbColor: RGBColor,
+  options: ColorComparisonOptions
 ): ImageData {
   const newData = cloneImgData(originalData);
   const replacementColor = getRgbaU8FromRgb(replacementRgbColor);
   const targetColor = getPixelColorAt(newData, floodStartLocation);
+  const isColorCloseEnoughToTarget = getColorComparator(targetColor, options);
 
   if (areColorsEqual(replacementColor, targetColor)) {
     return newData;
@@ -196,28 +241,40 @@ function getImgDataAfterFloodFill(
     const location = queue.dequeue();
     getWestNeighbor(location).ifSome(neighbor => {
       const neighborColor = getPixelColorAt(newData, neighbor);
-      if (areColorsEqual(neighborColor, targetColor)) {
+      if (
+        isColorCloseEnoughToTarget(neighborColor) &&
+        !areColorsEqual(replacementColor, neighborColor)
+      ) {
         writePixel(newData, neighbor, replacementColor);
         queue.enqueue(neighbor);
       }
     });
     getNorthNeighbor(location).ifSome(neighbor => {
       const neighborColor = getPixelColorAt(newData, neighbor);
-      if (areColorsEqual(neighborColor, targetColor)) {
+      if (
+        isColorCloseEnoughToTarget(neighborColor) &&
+        !areColorsEqual(replacementColor, neighborColor)
+      ) {
         writePixel(newData, neighbor, replacementColor);
         queue.enqueue(neighbor);
       }
     });
     getEastNeighbor(location, imgWidth).ifSome(neighbor => {
       const neighborColor = getPixelColorAt(newData, neighbor);
-      if (areColorsEqual(neighborColor, targetColor)) {
+      if (
+        isColorCloseEnoughToTarget(neighborColor) &&
+        !areColorsEqual(replacementColor, neighborColor)
+      ) {
         writePixel(newData, neighbor, replacementColor);
         queue.enqueue(neighbor);
       }
     });
     getSouthNeighbor(location, imgHeight).ifSome(neighbor => {
       const neighborColor = getPixelColorAt(newData, neighbor);
-      if (areColorsEqual(neighborColor, targetColor)) {
+      if (
+        isColorCloseEnoughToTarget(neighborColor) &&
+        !areColorsEqual(replacementColor, neighborColor)
+      ) {
         writePixel(newData, neighbor, replacementColor);
         queue.enqueue(neighbor);
       }
@@ -253,6 +310,33 @@ function getPixelColorAt(
   }
   const i = 4 * (y * width + x);
   return { r: data[i], g: data[i + 1], b: data[i + 2], a: data[i + 3] };
+}
+
+function getColorComparator(
+  targetColor: RgbaU8,
+  options: ColorComparisonOptions
+): (color: RgbaU8) => boolean {
+  const { tolerance, shouldCompareAlpha } = options;
+  const tolSq = tolerance * tolerance;
+
+  if (shouldCompareAlpha) {
+    return function isColorCloseEnoughToTarget(color: RgbaU8): boolean {
+      const dr = targetColor.r - color.r;
+      const dg = targetColor.g - color.g;
+      const db = targetColor.b - color.b;
+      const da = targetColor.a - color.a;
+      const distSq = dr * dr + dg * dg + db * db + da * da;
+      return distSq <= tolSq;
+    };
+  } else {
+    return function isColorCloseEnoughToTarget(color: RgbaU8): boolean {
+      const dr = targetColor.r - color.r;
+      const dg = targetColor.g - color.g;
+      const db = targetColor.b - color.b;
+      const distSq = dr * dr + dg * dg + db * db;
+      return distSq <= tolSq;
+    };
+  }
 }
 
 function areColorsEqual(c1: RgbaU8, c2: RgbaU8): boolean {
