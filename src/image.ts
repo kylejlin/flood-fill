@@ -1,7 +1,7 @@
 import Option from "@kylejlin/option";
 import { RGBColor } from "react-color";
 
-import { ColorComparisonOptions, Queue, RgbaU8 } from "./types";
+import { ColorComparisonOptions, Queue, RgbaU8, Fill } from "./types";
 
 export function getImgData(img: HTMLImageElement): ImageData {
   const canvas = document.createElement("canvas");
@@ -24,14 +24,20 @@ export function doesTargetColorEqualReplacementColor(
 
 export function getImgDataAfterFloodFill(
   originalData: ImageData,
-  floodStartLocation: { x: number; y: number },
-  replacementRgbColor: RGBColor,
-  options: ColorComparisonOptions
+  fill: Fill
 ): ImageData {
+  const {
+    startLocation,
+    replacementColor: replacementRgbColor,
+    colorComparisonOptions
+  } = fill;
   const newData = cloneImgData(originalData);
   const replacementColor = getRgbaU8FromRgb(replacementRgbColor);
-  const targetColor = getPixelColorAt(newData, floodStartLocation);
-  const isColorCloseEnoughToTarget = getColorComparator(targetColor, options);
+  const targetColor = getPixelColorAt(newData, startLocation);
+  const isColorCloseEnoughToTarget = getColorComparator(
+    targetColor,
+    colorComparisonOptions
+  );
 
   if (areColorsEqual(replacementColor, targetColor)) {
     return newData;
@@ -39,10 +45,10 @@ export function getImgDataAfterFloodFill(
 
   const { width: imgWidth, height: imgHeight } = originalData;
 
-  writePixel(newData, floodStartLocation, replacementColor);
+  writePixel(newData, startLocation, replacementColor);
 
   const queue: Queue<{ x: number; y: number }> = Queue.empty();
-  queue.enqueue(floodStartLocation);
+  queue.enqueue(startLocation);
 
   while (queue.hasItem()) {
     const location = queue.dequeue();

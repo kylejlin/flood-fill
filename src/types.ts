@@ -1,4 +1,5 @@
 import Option from "@kylejlin/option";
+import { RGBColor } from "react-color";
 
 export interface RgbaU8 {
   r: number;
@@ -10,6 +11,17 @@ export interface RgbaU8 {
 export interface ColorComparisonOptions {
   tolerance: number;
   shouldCompareAlpha: boolean;
+}
+
+export interface Fill {
+  startLocation: { x: number; y: number };
+  replacementColor: RGBColor;
+  colorComparisonOptions: ColorComparisonOptions;
+}
+
+export interface Snapshot {
+  fill: Option<Fill>;
+  imgDataAfterFill: ImageData;
 }
 
 export class Queue<T> {

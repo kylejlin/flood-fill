@@ -6,7 +6,7 @@ import "./App.css";
 
 import Canvas from "./components/Canvas";
 
-import { History } from "./types";
+import { History, Snapshot, Fill, ColorComparisonOptions } from "./types";
 
 import readFileAsHtmlImage from "./readFileAsHtmlImage";
 import {
@@ -193,7 +193,7 @@ export default class App extends React.Component<{}, State> {
             .andThen(history => history.current())
             .match({
               none: () => null,
-              some: imgData => (
+              some: snapshot => (
                 <div
                   className={
                     "MainCanvasContainer" +
@@ -210,7 +210,7 @@ export default class App extends React.Component<{}, State> {
                       })}
                 >
                   <Canvas
-                    imgData={imgData}
+                    imgData={snapshot.imgDataAfterFill}
                     canvasRef={this.mainCanvasRef}
                     className={"MainCanvas"}
                     onClick={this.onCanvasClick}
@@ -246,18 +246,18 @@ export default class App extends React.Component<{}, State> {
                 </p>
 
                 <div className="Snapshots" ref={this.snapshotsRef}>
-                  {history.past().map((imgData, i) => (
+                  {history.past().map((snapshot, i) => (
                     <Canvas
                       key={i}
-                      imgData={imgData}
+                      imgData={snapshot.imgDataAfterFill}
                       className="HistorySnapshot NonFinalSnapshot"
                     />
                   ))}
                   {history.current().match({
                     none: () => null,
-                    some: imgData => (
+                    some: snapshot => (
                       <Canvas
-                        imgData={imgData}
+                        imgData={snapshot.imgDataAfterFill}
                         className={
                           "HistorySnapshot CurrentSnapshot" +
                           (history.future().length > 0
@@ -268,10 +268,10 @@ export default class App extends React.Component<{}, State> {
                       />
                     )
                   })}
-                  {history.future().map((imgData, i, { length }) => (
+                  {history.future().map((snapshot, i, { length }) => (
                     <Canvas
                       key={i}
-                      imgData={imgData}
+                      imgData={snapshot.imgDataAfterFill}
                       className={
                         "HistorySnapshot" +
                         (i < length - 1 ? " NonFinalSnapshot" : "")
@@ -302,9 +302,13 @@ export default class App extends React.Component<{}, State> {
 
         readFileAsHtmlImage(file).then(img => {
           const imgData = getImgData(img);
+          const snapshot: Snapshot = {
+            fill: Option.none(),
+            imgDataAfterFill: imgData
+          };
 
           this.setState({
-            history: Option.some(History.fromCurrent(imgData))
+            history: Option.some(History.fromCurrent(snapshot))
           });
         });
       }
@@ -320,39 +324,42 @@ export default class App extends React.Component<{}, State> {
       this.state.replacementColor,
       this.state.history,
       this.state.history.andThen(history => history.current())
-    ]).ifSome(([replacementColor, history, currentImgData]) => {
+    ]).ifSome(([replacementColor, history, currentSnapshot]) => {
       const { clientX, clientY } = event;
       const canvas = this.mainCanvasRef.current!;
-      const dataBefore = currentImgData;
+      const dataBefore = currentSnapshot.imgDataAfterFill;
 
       const box = canvas.getBoundingClientRect();
       const localX = Math.round(clientX - box.left);
       const localY = Math.round(clientY - box.top);
-      const location = { x: localX, y: localY };
+      const startLocation = { x: localX, y: localY };
 
       if (
         doesTargetColorEqualReplacementColor(
           dataBefore,
-          location,
+          startLocation,
           replacementColor
         )
       ) {
         return;
       }
 
-      const options = {
+      const colorComparisonOptions: ColorComparisonOptions = {
         tolerance: parseInt(this.state.toleranceStr, 10),
         shouldCompareAlpha: this.state.shouldCompareAlpha
       };
-
-      const dataAfter = getImgDataAfterFloodFill(
-        dataBefore,
-        location,
+      const fill: Fill = {
+        startLocation,
         replacementColor,
-        options
-      );
+        colorComparisonOptions
+      };
+      const imgDataAfterFill = getImgDataAfterFloodFill(dataBefore, fill);
+      const newSnapshot: Snapshot = {
+        fill: Option.some(fill),
+        imgDataAfterFill
+      };
 
-      history.push(dataAfter);
+      history.push(newSnapshot);
       this.forceUpdate();
     });
   }
@@ -423,7 +430,7 @@ interface State {
   fileName: Option<string>;
   shouldBackdropBeCheckered: boolean;
   backdropColorHex: string;
-  history: Option<History<ImageData>>;
+  history: Option<History<Snapshot>>;
   replacementColor: Option<RGBColor>;
   toleranceStr: string;
   shouldCompareAlpha: boolean;
