@@ -6,7 +6,13 @@ import "./App.css";
 
 import Canvas from "./components/Canvas";
 
-import { History, Snapshot, Fill, ColorComparisonOptions } from "./types";
+import {
+  History,
+  Snapshot,
+  Fill,
+  ColorComparisonOptions,
+  FillUpdate
+} from "./types";
 
 import readFileAsHtmlImage from "./readFileAsHtmlImage";
 import {
@@ -33,7 +39,8 @@ export default class App extends React.Component<{}, State> {
       history: Option.none(),
       replacementColor: Option.none(),
       toleranceStr: "0",
-      shouldCompareAlpha: false
+      shouldCompareAlpha: false,
+      isAdjustingPreviousFill: false
     };
 
     this.bindMethods();
@@ -63,6 +70,10 @@ export default class App extends React.Component<{}, State> {
     this.onShouldBackdropBeCheckeredChange = this.onShouldBackdropBeCheckeredChange.bind(
       this
     );
+    this.onStopAdjustingPreviousFillClick = this.onStopAdjustingPreviousFillClick.bind(
+      this
+    );
+    this.onAdjustPreviousFillClick = this.onAdjustPreviousFillClick.bind(this);
   }
 
   componentDidMount() {
@@ -77,7 +88,8 @@ export default class App extends React.Component<{}, State> {
     if (
       document.activeElement === document.body &&
       event.key.toLowerCase() === "z" &&
-      (event.ctrlKey || event.metaKey)
+      (event.ctrlKey || event.metaKey) &&
+      !this.state.isAdjustingPreviousFill
     ) {
       event.preventDefault();
       if (event.shiftKey) {
@@ -139,6 +151,39 @@ export default class App extends React.Component<{}, State> {
             none: () => null,
             some: color => (
               <div>
+                {this.state.isAdjustingPreviousFill ? (
+                  <div>
+                    <h3>Adjusting the previous fill</h3>
+                    <p>
+                      Any changes you make to the fill settings (including
+                      changing the flood start location by clicking on the
+                      image) will adjust the previous fill.
+                    </p>
+                    <button onClick={this.onStopAdjustingPreviousFillClick}>
+                      Stop adjusting
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <h3>Adjusting next fill</h3>
+                    <p>
+                      Any changes you make to the fill settings will apply to
+                      the next fill performed. Clicking on the image will cause
+                      a new fill to be performed.
+                    </p>
+                    <button
+                      onClick={this.onAdjustPreviousFillClick}
+                      disabled={this.state.history
+                        .andThen(history =>
+                          history.current().andThen(current => current.fill)
+                        )
+                        .isNone()}
+                    >
+                      Adjust previous fill
+                    </button>
+                  </div>
+                )}
+
                 <label>
                   Replacement color:
                   <SketchPicker
@@ -175,6 +220,15 @@ export default class App extends React.Component<{}, State> {
                     type="number"
                     value={this.state.toleranceStr}
                     onChange={this.onToleranceChange}
+                  />
+                  <input
+                    type="range"
+                    value={this.state.toleranceStr}
+                    onChange={this.onToleranceChange}
+                    min={0}
+                    max={Math.ceil(
+                      getMaxEuclideanDistance(this.state.shouldCompareAlpha)
+                    )}
                   />
                 </label>
                 <label>
@@ -225,25 +279,39 @@ export default class App extends React.Component<{}, State> {
               <div>
                 <h3>History</h3>
 
+                {this.state.isAdjustingPreviousFill && (
+                  <p>
+                    You cannot undo or redo because you are adjusting the
+                    previous fill. To be able to undo and redo, stop adjusting
+                    the previous fill.
+                  </p>
+                )}
+
                 <button
                   onClick={this.onUndoClick}
-                  disabled={!history.canUndo()}
+                  disabled={
+                    !history.canUndo() || this.state.isAdjustingPreviousFill
+                  }
                 >
                   Undo
                 </button>
 
                 <button
                   onClick={this.onRedoClick}
-                  disabled={!history.canRedo()}
+                  disabled={
+                    !history.canRedo() || this.state.isAdjustingPreviousFill
+                  }
                 >
                   Redo
                 </button>
 
-                <p>
-                  You can also Undo by pressing <kbd>Ctrl-Z</kbd> or{" "}
-                  <kbd>Cmd-Z</kbd> and Redo by pressing <kbd>Ctrl-Shift-Z</kbd>{" "}
-                  or <kbd>Cmd-Shift-Z</kbd>.
-                </p>
+                {!this.state.isAdjustingPreviousFill && (
+                  <p>
+                    You can also Undo by pressing <kbd>Ctrl-Z</kbd> or{" "}
+                    <kbd>Cmd-Z</kbd> and Redo by pressing{" "}
+                    <kbd>Ctrl-Shift-Z</kbd> or <kbd>Cmd-Shift-Z</kbd>.
+                  </p>
+                )}
 
                 <div className="Snapshots" ref={this.snapshotsRef}>
                   {history.past().map((snapshot, i) => (
@@ -297,14 +365,15 @@ export default class App extends React.Component<{}, State> {
           history: Option.none(),
           replacementColor: this.state.replacementColor.or(
             Option.some({ r: 0, g: 0, b: 0, a: 0 })
-          )
+          ),
+          isAdjustingPreviousFill: false
         });
 
         readFileAsHtmlImage(file).then(img => {
-          const imgData = getImgData(img);
+          const imgDataAfterFill = getImgData(img);
           const snapshot: Snapshot = {
             fill: Option.none(),
-            imgDataAfterFill: imgData
+            imgDataAfterFill
           };
 
           this.setState({
@@ -316,7 +385,12 @@ export default class App extends React.Component<{}, State> {
   }
 
   onReplacementColorChangeComplete(color: ColorResult) {
-    this.setState({ replacementColor: Option.some(color.rgb) });
+    const replacementColor = color.rgb;
+    this.setState({ replacementColor: Option.some(replacementColor) });
+
+    if (this.state.isAdjustingPreviousFill) {
+      this.adjustPreviousFill({ replacementColor });
+    }
   }
 
   onCanvasClick(event: React.MouseEvent<HTMLCanvasElement>) {
@@ -344,32 +418,75 @@ export default class App extends React.Component<{}, State> {
         return;
       }
 
-      const colorComparisonOptions: ColorComparisonOptions = {
-        tolerance: parseInt(this.state.toleranceStr, 10),
-        shouldCompareAlpha: this.state.shouldCompareAlpha
-      };
-      const fill: Fill = {
-        startLocation,
-        replacementColor,
-        colorComparisonOptions
-      };
-      const imgDataAfterFill = getImgDataAfterFloodFill(dataBefore, fill);
-      const newSnapshot: Snapshot = {
-        fill: Option.some(fill),
-        imgDataAfterFill
-      };
+      if (this.state.isAdjustingPreviousFill) {
+        this.adjustPreviousFill({ startLocation });
+      } else {
+        const colorComparisonOptions: ColorComparisonOptions = {
+          tolerance: parseInt(this.state.toleranceStr, 10),
+          shouldCompareAlpha: this.state.shouldCompareAlpha
+        };
+        const fill: Fill = {
+          startLocation,
+          replacementColor,
+          colorComparisonOptions
+        };
+        const imgDataAfterFill = getImgDataAfterFloodFill(dataBefore, fill);
+        const newSnapshot: Snapshot = {
+          fill: Option.some(fill),
+          imgDataAfterFill
+        };
 
-      history.push(newSnapshot);
-      this.forceUpdate();
+        history.push(newSnapshot);
+        this.forceUpdate();
+      }
     });
   }
 
   onToleranceChange(event: React.ChangeEvent<HTMLInputElement>) {
-    this.setState({ toleranceStr: event.target.value });
+    const toleranceStr = event.target.value;
+    this.setState({ toleranceStr });
+
+    if (this.state.isAdjustingPreviousFill) {
+      this.adjustPreviousFill({
+        colorComparisonOptions: { tolerance: parseInt(toleranceStr, 10) }
+      });
+    }
   }
 
   onShouldCompareAlphaChange(event: React.ChangeEvent<HTMLInputElement>) {
-    this.setState({ shouldCompareAlpha: event.target.checked });
+    const shouldCompareAlpha = event.target.checked;
+    this.setState({ shouldCompareAlpha });
+
+    if (this.state.isAdjustingPreviousFill) {
+      this.adjustPreviousFill({
+        colorComparisonOptions: { shouldCompareAlpha }
+      });
+    }
+  }
+
+  adjustPreviousFill(fillUpdate: FillUpdate) {
+    const history = this.state.history.expect(
+      "Cannot call adjustPreviousFill if there is no history"
+    );
+    const currentSnapshot = history
+      .current()
+      .expect("Cannot call adjustPreviousFill if there is no current snapshot");
+    const previousSnapshot = history
+      .prev()
+      .expect(
+        "Cannot call adjustPreviousFill if there is no previous snapshot"
+      );
+    const previousFill = currentSnapshot.fill.expect(
+      "Cannot call adjustPreviousFill if the current snapshot was not created by flood-fill"
+    );
+    const updatedFill = applyFillUpdate(previousFill, fillUpdate);
+
+    currentSnapshot.fill = Option.some(updatedFill);
+    currentSnapshot.imgDataAfterFill = getImgDataAfterFloodFill(
+      previousSnapshot.imgDataAfterFill,
+      updatedFill
+    );
+    this.forceUpdate();
   }
 
   onUndoClick() {
@@ -424,6 +541,14 @@ export default class App extends React.Component<{}, State> {
       );
     }
   }
+
+  onStopAdjustingPreviousFillClick() {
+    this.setState({ isAdjustingPreviousFill: false });
+  }
+
+  onAdjustPreviousFillClick() {
+    this.setState({ isAdjustingPreviousFill: true });
+  }
 }
 
 interface State {
@@ -434,4 +559,35 @@ interface State {
   replacementColor: Option<RGBColor>;
   toleranceStr: string;
   shouldCompareAlpha: boolean;
+  isAdjustingPreviousFill: boolean;
+}
+
+function applyFillUpdate(prevFill: Fill, update: FillUpdate): Fill {
+  const newTolerance =
+    update.colorComparisonOptions && update.colorComparisonOptions.tolerance;
+  const newShouldCompareAlpha =
+    update.colorComparisonOptions &&
+    update.colorComparisonOptions.shouldCompareAlpha;
+  return {
+    startLocation: update.startLocation || prevFill.startLocation,
+    replacementColor: update.replacementColor || prevFill.replacementColor,
+    colorComparisonOptions: {
+      tolerance:
+        newTolerance !== undefined
+          ? newTolerance
+          : prevFill.colorComparisonOptions.tolerance,
+      shouldCompareAlpha:
+        newShouldCompareAlpha !== undefined
+          ? newShouldCompareAlpha
+          : prevFill.colorComparisonOptions.shouldCompareAlpha
+    }
+  };
+}
+
+function getMaxEuclideanDistance(shouldCompareAlpha: boolean): number {
+  if (shouldCompareAlpha) {
+    return Math.hypot(255, 255, 255, 255);
+  } else {
+    return Math.hypot(255, 255, 255);
+  }
 }

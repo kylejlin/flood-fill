@@ -19,6 +19,12 @@ export interface Fill {
   colorComparisonOptions: ColorComparisonOptions;
 }
 
+export interface FillUpdate {
+  startLocation?: Fill["startLocation"];
+  replacementColor?: Fill["replacementColor"];
+  colorComparisonOptions?: Partial<Fill["colorComparisonOptions"]>;
+}
+
 export interface Snapshot {
   fill: Option<Fill>;
   imgDataAfterFill: ImageData;
@@ -123,5 +129,14 @@ export class History<T> {
 
   future(): T[] {
     return this.redoStack.slice().reverse();
+  }
+
+  prev(): Option<T> {
+    const past = this.past();
+    if (past.length > 0) {
+      return Option.some(past[past.length - 1]);
+    } else {
+      return Option.none();
+    }
   }
 }
