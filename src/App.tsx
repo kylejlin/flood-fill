@@ -27,7 +27,6 @@ export default class App extends React.Component<{}, State> {
     window.app = this;
 
     this.state = {
-      originalImg: Option.none(),
       fileName: Option.none(),
       shouldBackdropBeCheckered: true,
       backdropColorHex: "#222222",
@@ -116,7 +115,23 @@ export default class App extends React.Component<{}, State> {
                   />
                 </label>
               ),
-              some: fileName => <p>Successfully uploaded {fileName}</p>
+              some: fileName =>
+                this.state.history.match({
+                  none: () => <p>Loading {fileName}...</p>,
+                  some: () => (
+                    <>
+                      <p>Successfully uploaded {fileName}</p>
+                      <label>
+                        Choose another image{" "}
+                        <input
+                          type="file"
+                          accept="image/png, image/jpg, image/jpeg, image/gif"
+                          onChange={this.onFileChange}
+                        />
+                      </label>
+                    </>
+                  )
+                })
             })}
           </div>
 
@@ -277,14 +292,19 @@ export default class App extends React.Component<{}, State> {
     if (files !== null) {
       const file = files[0];
       if (file instanceof File && /\.(jpe?g|png|gif)$/i.test(file.name)) {
+        this.setState({
+          fileName: Option.some(file.name),
+          history: Option.none(),
+          replacementColor: this.state.replacementColor.or(
+            Option.some({ r: 0, g: 0, b: 0, a: 0 })
+          )
+        });
+
         readFileAsHtmlImage(file).then(img => {
           const imgData = getImgData(img);
 
           this.setState({
-            originalImg: Option.some(img),
-            fileName: Option.some(file.name),
-            history: Option.some(History.fromCurrent(imgData)),
-            replacementColor: Option.some({ r: 0, g: 0, b: 0, a: 0 })
+            history: Option.some(History.fromCurrent(imgData))
           });
         });
       }
@@ -400,7 +420,6 @@ export default class App extends React.Component<{}, State> {
 }
 
 interface State {
-  originalImg: Option<HTMLImageElement>;
   fileName: Option<string>;
   shouldBackdropBeCheckered: boolean;
   backdropColorHex: string;

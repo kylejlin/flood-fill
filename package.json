@@ -4,7 +4,7 @@
   "private": true,
   "homepage": "https://kylejlin.github.io/flood-fill",
   "dependencies": {
-    "@kylejlin/option": "^1.0.0",
+    "@kylejlin/option": "^1.1.1",
     "@types/jest": "24.0.22",
     "@types/node": "12.12.7",
     "@types/react": "16.9.11",
