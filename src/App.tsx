@@ -44,7 +44,8 @@ export default class App extends React.Component<{}, State> {
       toleranceStr: "0",
       shouldCompareAlpha: false,
       isAdjustingPreviousFill: false,
-      isSelectingReplacementColorFromCurrentSnapshot: false
+      isSelectingReplacementColorFromCurrentSnapshot: false,
+      pendingFillUpdate: Option.none()
     };
 
     this.bindMethods();
@@ -56,6 +57,8 @@ export default class App extends React.Component<{}, State> {
 
   bindMethods() {
     this.onKeyDown = this.onKeyDown.bind(this);
+
+    this.applyPendingFillUpdate = this.applyPendingFillUpdate.bind(this);
 
     this.onFileChange = this.onFileChange.bind(this);
     this.onReplacementColorChangeComplete = this.onReplacementColorChangeComplete.bind(
@@ -418,7 +421,8 @@ export default class App extends React.Component<{}, State> {
           replacementColor: this.state.replacementColor.or(
             Option.some({ r: 0, g: 0, b: 0, a: 0 })
           ),
-          isAdjustingPreviousFill: false
+          isAdjustingPreviousFill: false,
+          pendingFillUpdate: Option.none()
         });
 
         readFileAsHtmlImage(file).then(img => {
@@ -525,13 +529,40 @@ export default class App extends React.Component<{}, State> {
     this.setState({ shouldCompareAlpha });
 
     if (this.state.isAdjustingPreviousFill) {
-      this.adjustPreviousFill({
-        colorComparisonOptions: { shouldCompareAlpha }
-      });
+      if (event.target.type === "slider") {
+        this.debouncedAdjustPreviousFill({
+          colorComparisonOptions: { shouldCompareAlpha }
+        });
+      } else {
+        this.adjustPreviousFill({
+          colorComparisonOptions: { shouldCompareAlpha }
+        });
+      }
     }
   }
 
+  debouncedAdjustPreviousFill(fillUpdate: FillUpdate) {
+    this.state.pendingFillUpdate.ifNone(() => {
+      this.setState({ pendingFillUpdate: Option.some(fillUpdate) });
+      requestAnimationFrame(this.applyPendingFillUpdate);
+    });
+  }
+
+  applyPendingFillUpdate() {
+    this.state.pendingFillUpdate.ifSome(update => {
+      this.clearPendingFillUpdate();
+      this.adjustPreviousFill(update);
+    });
+  }
+
+  clearPendingFillUpdate() {
+    this.setState({ pendingFillUpdate: Option.none() });
+  }
+
   adjustPreviousFill(fillUpdate: FillUpdate) {
+    // Prevent a pending update from overwriting this update in the future.
+    this.clearPendingFillUpdate();
+
     const history = this.state.history.expect(
       "Cannot call adjustPreviousFill if there is no history"
     );
@@ -635,6 +666,7 @@ interface State {
   shouldCompareAlpha: boolean;
   isAdjustingPreviousFill: boolean;
   isSelectingReplacementColorFromCurrentSnapshot: boolean;
+  pendingFillUpdate: Option<FillUpdate>;
 }
 
 function applyFillUpdate(prevFill: Fill, update: FillUpdate): Fill {
