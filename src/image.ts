@@ -12,16 +12,6 @@ export function getImgData(img: HTMLImageElement): ImageData {
   return ctx.getImageData(0, 0, canvas.width, canvas.height);
 }
 
-export function doesTargetColorEqualReplacementColor(
-  imgData: ImageData,
-  floodStartLocation: { x: number; y: number },
-  replacementRgbColor: RGBColor
-): boolean {
-  const replacementColor = getRgbaU8FromRgb(replacementRgbColor);
-  const targetColor = getPixelColorAt(imgData, floodStartLocation);
-  return areColorsEqual(replacementColor, targetColor);
-}
-
 export function getImgDataAfterFloodFill(
   originalData: ImageData,
   fill: Fill
@@ -101,7 +91,7 @@ function cloneImgData(original: ImageData): ImageData {
   return new ImageData(original.data.slice(), original.width, original.height);
 }
 
-function getRgbaU8FromRgb(rgb: RGBColor): RgbaU8 {
+export function getRgbaU8FromRgb(rgb: RGBColor): RgbaU8 {
   return {
     r: rgb.r,
     g: rgb.g,
@@ -110,7 +100,7 @@ function getRgbaU8FromRgb(rgb: RGBColor): RgbaU8 {
   };
 }
 
-function getPixelColorAt(
+export function getPixelColorAt(
   imgData: ImageData,
   { x, y }: { x: number; y: number }
 ): RgbaU8 {
@@ -152,7 +142,7 @@ function getColorComparator(
   }
 }
 
-function areColorsEqual(c1: RgbaU8, c2: RgbaU8): boolean {
+export function areColorsEqual(c1: RgbaU8, c2: RgbaU8): boolean {
   return c1.r === c2.r && c1.g === c2.g && c1.b === c2.b && c1.a === c2.a;
 }
 

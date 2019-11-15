@@ -1,6 +1,6 @@
 import React from "react";
 import Option from "@kylejlin/option";
-import { SketchPicker, ColorResult, RGBColor } from "react-color";
+import { SketchPicker, ColorResult } from "react-color";
 
 import "./App.css";
 
@@ -11,14 +11,17 @@ import {
   Snapshot,
   Fill,
   ColorComparisonOptions,
-  FillUpdate
+  FillUpdate,
+  RgbaU8
 } from "./types";
 
 import readFileAsHtmlImage from "./readFileAsHtmlImage";
 import {
-  doesTargetColorEqualReplacementColor,
   getImgData,
-  getImgDataAfterFloodFill
+  getImgDataAfterFloodFill,
+  getPixelColorAt,
+  getRgbaU8FromRgb,
+  areColorsEqual
 } from "./image";
 
 export default class App extends React.Component<{}, State> {
@@ -40,7 +43,8 @@ export default class App extends React.Component<{}, State> {
       replacementColor: Option.none(),
       toleranceStr: "0",
       shouldCompareAlpha: false,
-      isAdjustingPreviousFill: false
+      isAdjustingPreviousFill: false,
+      isSelectingReplacementColorFromCurrentSnapshot: false
     };
 
     this.bindMethods();
@@ -74,6 +78,9 @@ export default class App extends React.Component<{}, State> {
       this
     );
     this.onAdjustPreviousFillClick = this.onAdjustPreviousFillClick.bind(this);
+    this.onIsSelectingReplacementColorFromCurrentSnapshotChange = this.onIsSelectingReplacementColorFromCurrentSnapshotChange.bind(
+      this
+    );
   }
 
   componentDidMount() {
@@ -154,11 +161,24 @@ export default class App extends React.Component<{}, State> {
                 {this.state.isAdjustingPreviousFill ? (
                   <div>
                     <h3>Adjusting the previous fill</h3>
-                    <p>
-                      Any changes you make to the fill settings (including
-                      changing the flood start location by clicking on the
-                      image) will adjust the previous fill.
-                    </p>
+
+                    {this.state
+                      .isSelectingReplacementColorFromCurrentSnapshot ? (
+                      <p>
+                        Any changes you make to the fill settings will adjust
+                        the previous fill. Since you have the "Select replacment
+                        color from image" option checked, clicking on the image
+                        will adjust the previous fill's replacement color to the
+                        clicked color.
+                      </p>
+                    ) : (
+                      <p>
+                        Any changes you make to the fill settings (including
+                        changing the flood start location by clicking on the
+                        image) will adjust the previous fill.
+                      </p>
+                    )}
+
                     <button onClick={this.onStopAdjustingPreviousFillClick}>
                       Stop adjusting
                     </button>
@@ -166,11 +186,24 @@ export default class App extends React.Component<{}, State> {
                 ) : (
                   <div>
                     <h3>Adjusting next fill</h3>
-                    <p>
-                      Any changes you make to the fill settings will apply to
-                      the next fill performed. Clicking on the image will cause
-                      a new fill to be performed.
-                    </p>
+
+                    {this.state
+                      .isSelectingReplacementColorFromCurrentSnapshot ? (
+                      <p>
+                        Any changes you make to the fill settings will apply to
+                        the next fill performed. Since you have the "Select
+                        replacment color from image" option checked, clicking on
+                        the image will set the next fill's replacement color to
+                        the clicked color.
+                      </p>
+                    ) : (
+                      <p>
+                        Any changes you make to the fill settings will apply to
+                        the next fill performed. Clicking on the image will
+                        cause a new fill to be performed.
+                      </p>
+                    )}
+
                     <button
                       onClick={this.onAdjustPreviousFillClick}
                       disabled={this.state.history
@@ -184,13 +217,32 @@ export default class App extends React.Component<{}, State> {
                   </div>
                 )}
 
-                <label>
-                  Replacement color:
-                  <SketchPicker
-                    color={color}
-                    onChangeComplete={this.onReplacementColorChangeComplete}
-                  />
-                </label>
+                <div>
+                  <label>
+                    Select replacement color from image:{" "}
+                    <input
+                      type="checkbox"
+                      checked={
+                        this.state
+                          .isSelectingReplacementColorFromCurrentSnapshot
+                      }
+                      onChange={
+                        this
+                          .onIsSelectingReplacementColorFromCurrentSnapshotChange
+                      }
+                    />
+                  </label>
+                </div>
+
+                <div>
+                  <label>
+                    Replacement color:
+                    <SketchPicker
+                      color={color}
+                      onChangeComplete={this.onReplacementColorChangeComplete}
+                    />
+                  </label>
+                </div>
 
                 <section>
                   <h3>Backdrop</h3>
@@ -385,7 +437,7 @@ export default class App extends React.Component<{}, State> {
   }
 
   onReplacementColorChangeComplete(color: ColorResult) {
-    const replacementColor = color.rgb;
+    const replacementColor = getRgbaU8FromRgb(color.rgb);
     this.setState({ replacementColor: Option.some(replacementColor) });
 
     if (this.state.isAdjustingPreviousFill) {
@@ -409,35 +461,50 @@ export default class App extends React.Component<{}, State> {
       const startLocation = { x: localX, y: localY };
 
       if (
-        doesTargetColorEqualReplacementColor(
-          dataBefore,
-          startLocation,
-          replacementColor
+        areColorsEqual(
+          replacementColor,
+          getPixelColorAt(dataBefore, startLocation)
         )
       ) {
         return;
       }
 
       if (this.state.isAdjustingPreviousFill) {
-        this.adjustPreviousFill({ startLocation });
+        if (this.state.isSelectingReplacementColorFromCurrentSnapshot) {
+          const newReplacementColor = getPixelColorAt(
+            dataBefore,
+            startLocation
+          );
+          this.adjustPreviousFill({ replacementColor: newReplacementColor });
+        } else {
+          this.adjustPreviousFill({ startLocation });
+        }
       } else {
-        const colorComparisonOptions: ColorComparisonOptions = {
-          tolerance: parseInt(this.state.toleranceStr, 10),
-          shouldCompareAlpha: this.state.shouldCompareAlpha
-        };
-        const fill: Fill = {
-          startLocation,
-          replacementColor,
-          colorComparisonOptions
-        };
-        const imgDataAfterFill = getImgDataAfterFloodFill(dataBefore, fill);
-        const newSnapshot: Snapshot = {
-          fill: Option.some(fill),
-          imgDataAfterFill
-        };
+        if (this.state.isSelectingReplacementColorFromCurrentSnapshot) {
+          const newReplacementColor = getPixelColorAt(
+            dataBefore,
+            startLocation
+          );
+          this.setState({ replacementColor: Option.some(newReplacementColor) });
+        } else {
+          const colorComparisonOptions: ColorComparisonOptions = {
+            tolerance: parseInt(this.state.toleranceStr, 10),
+            shouldCompareAlpha: this.state.shouldCompareAlpha
+          };
+          const fill: Fill = {
+            startLocation,
+            replacementColor,
+            colorComparisonOptions
+          };
+          const imgDataAfterFill = getImgDataAfterFloodFill(dataBefore, fill);
+          const newSnapshot: Snapshot = {
+            fill: Option.some(fill),
+            imgDataAfterFill
+          };
 
-        history.push(newSnapshot);
-        this.forceUpdate();
+          history.push(newSnapshot);
+          this.forceUpdate();
+        }
       }
     });
   }
@@ -549,6 +616,13 @@ export default class App extends React.Component<{}, State> {
   onAdjustPreviousFillClick() {
     this.setState({ isAdjustingPreviousFill: true });
   }
+  onIsSelectingReplacementColorFromCurrentSnapshotChange(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    this.setState({
+      isSelectingReplacementColorFromCurrentSnapshot: event.target.checked
+    });
+  }
 }
 
 interface State {
@@ -556,10 +630,11 @@ interface State {
   shouldBackdropBeCheckered: boolean;
   backdropColorHex: string;
   history: Option<History<Snapshot>>;
-  replacementColor: Option<RGBColor>;
+  replacementColor: Option<RgbaU8>;
   toleranceStr: string;
   shouldCompareAlpha: boolean;
   isAdjustingPreviousFill: boolean;
+  isSelectingReplacementColorFromCurrentSnapshot: boolean;
 }
 
 function applyFillUpdate(prevFill: Fill, update: FillUpdate): Fill {
