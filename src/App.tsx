@@ -12,7 +12,7 @@ import {
   Fill,
   ColorComparisonOptions,
   FillUpdate,
-  RgbaU8
+  RgbaU8,
 } from "./types";
 
 import readFileAsHtmlImage from "./readFileAsHtmlImage";
@@ -21,7 +21,7 @@ import {
   getImgDataAfterFloodFill,
   getPixelColorAt,
   getRgbaU8FromRgb,
-  areColorsEqual
+  areColorsEqual,
 } from "./image";
 
 export default class App extends React.Component<{}, State> {
@@ -45,7 +45,7 @@ export default class App extends React.Component<{}, State> {
       shouldCompareAlpha: false,
       isAdjustingPreviousFill: false,
       isSelectingReplacementColorFromCurrentSnapshot: false,
-      pendingFillUpdate: Option.none()
+      pendingFillUpdate: Option.none(),
     };
 
     this.bindMethods();
@@ -55,46 +55,40 @@ export default class App extends React.Component<{}, State> {
     this.currentSnapshotRef = React.createRef();
   }
 
-  bindMethods() {
+  bindMethods(): void {
     this.onKeyDown = this.onKeyDown.bind(this);
 
     this.applyPendingFillUpdate = this.applyPendingFillUpdate.bind(this);
 
     this.onFileChange = this.onFileChange.bind(this);
-    this.onReplacementColorChangeComplete = this.onReplacementColorChangeComplete.bind(
-      this
-    );
+    this.onReplacementColorChangeComplete =
+      this.onReplacementColorChangeComplete.bind(this);
     this.onCanvasClick = this.onCanvasClick.bind(this);
     this.onToleranceChange = this.onToleranceChange.bind(this);
-    this.onShouldCompareAlphaChange = this.onShouldCompareAlphaChange.bind(
-      this
-    );
+    this.onShouldCompareAlphaChange =
+      this.onShouldCompareAlphaChange.bind(this);
     this.onUndoClick = this.onUndoClick.bind(this);
     this.onRedoClick = this.onRedoClick.bind(this);
-    this.onBackdropColorChangeComplete = this.onBackdropColorChangeComplete.bind(
-      this
-    );
-    this.onShouldBackdropBeCheckeredChange = this.onShouldBackdropBeCheckeredChange.bind(
-      this
-    );
-    this.onStopAdjustingPreviousFillClick = this.onStopAdjustingPreviousFillClick.bind(
-      this
-    );
+    this.onBackdropColorChangeComplete =
+      this.onBackdropColorChangeComplete.bind(this);
+    this.onShouldBackdropBeCheckeredChange =
+      this.onShouldBackdropBeCheckeredChange.bind(this);
+    this.onStopAdjustingPreviousFillClick =
+      this.onStopAdjustingPreviousFillClick.bind(this);
     this.onAdjustPreviousFillClick = this.onAdjustPreviousFillClick.bind(this);
-    this.onIsSelectingReplacementColorFromCurrentSnapshotChange = this.onIsSelectingReplacementColorFromCurrentSnapshotChange.bind(
-      this
-    );
+    this.onIsSelectingReplacementColorFromCurrentSnapshotChange =
+      this.onIsSelectingReplacementColorFromCurrentSnapshotChange.bind(this);
   }
 
-  componentDidMount() {
+  componentDidMount(): void {
     window.addEventListener("keydown", this.onKeyDown);
   }
 
-  componentWillUnmount() {
+  componentWillUnmount(): void {
     window.removeEventListener("keydown", this.onKeyDown);
   }
 
-  onKeyDown(event: KeyboardEvent) {
+  onKeyDown(event: KeyboardEvent): void {
     if (
       document.activeElement === document.body &&
       event.key.toLowerCase() === "z" &&
@@ -103,13 +97,13 @@ export default class App extends React.Component<{}, State> {
     ) {
       event.preventDefault();
       if (event.shiftKey) {
-        this.state.history.ifSome(history => {
+        this.state.history.ifSome((history) => {
           if (history.canRedo()) {
             this.redo();
           }
         });
       } else {
-        this.state.history.ifSome(history => {
+        this.state.history.ifSome((history) => {
           if (history.canUndo()) {
             this.undo();
           }
@@ -118,7 +112,7 @@ export default class App extends React.Component<{}, State> {
     }
   }
 
-  render() {
+  render(): React.ReactElement {
     return (
       <>
         <header>
@@ -137,7 +131,7 @@ export default class App extends React.Component<{}, State> {
                   />
                 </label>
               ),
-              some: fileName =>
+              some: (fileName) =>
                 this.state.history.match({
                   none: () => <p>Loading {fileName}...</p>,
                   some: () => (
@@ -152,14 +146,14 @@ export default class App extends React.Component<{}, State> {
                         />
                       </label>
                     </>
-                  )
-                })
+                  ),
+                }),
             })}
           </div>
 
           {this.state.replacementColor.match({
             none: () => null,
-            some: color => (
+            some: (color) => (
               <div>
                 {this.state.isAdjustingPreviousFill ? (
                   <div>
@@ -210,8 +204,8 @@ export default class App extends React.Component<{}, State> {
                     <button
                       onClick={this.onAdjustPreviousFillClick}
                       disabled={this.state.history
-                        .andThen(history =>
-                          history.current().andThen(current => current.fill)
+                        .andThen((history) =>
+                          history.current().andThen((current) => current.fill)
                         )
                         .isNone()}
                     >
@@ -241,7 +235,12 @@ export default class App extends React.Component<{}, State> {
                   <label>
                     Replacement color:
                     <SketchPicker
-                      color={color}
+                      color={{
+                        r: color.r,
+                        g: color.g,
+                        b: color.b,
+                        a: color.a / 255,
+                      }}
                       onChangeComplete={this.onReplacementColorChangeComplete}
                     />
                   </label>
@@ -295,14 +294,14 @@ export default class App extends React.Component<{}, State> {
                   />
                 </label>
               </div>
-            )
+            ),
           })}
 
           {this.state.history
-            .andThen(history => history.current())
+            .andThen((history) => history.current())
             .match({
               none: () => null,
-              some: snapshot => (
+              some: (snapshot) => (
                 <div
                   className={
                     "MainCanvasContainer" +
@@ -314,8 +313,8 @@ export default class App extends React.Component<{}, State> {
                     ? {}
                     : {
                         style: {
-                          backgroundColor: this.state.backdropColorHex
-                        }
+                          backgroundColor: this.state.backdropColorHex,
+                        },
                       })}
                 >
                   <Canvas
@@ -325,12 +324,12 @@ export default class App extends React.Component<{}, State> {
                     onClick={this.onCanvasClick}
                   />
                 </div>
-              )
+              ),
             })}
 
           {this.state.history.match({
             none: () => null,
-            some: history => (
+            some: (history) => (
               <div>
                 <h3>History</h3>
 
@@ -378,7 +377,7 @@ export default class App extends React.Component<{}, State> {
                   ))}
                   {history.current().match({
                     none: () => null,
-                    some: snapshot => (
+                    some: (snapshot) => (
                       <Canvas
                         imgData={snapshot.imgDataAfterFill}
                         className={
@@ -389,7 +388,7 @@ export default class App extends React.Component<{}, State> {
                         }
                         canvasRef={this.currentSnapshotRef}
                       />
-                    )
+                    ),
                   })}
                   {history.future().map((snapshot, i, { length }) => (
                     <Canvas
@@ -403,14 +402,14 @@ export default class App extends React.Component<{}, State> {
                   ))}
                 </div>
               </div>
-            )
+            ),
           })}
         </main>
       </>
     );
   }
 
-  onFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+  onFileChange(event: React.ChangeEvent<HTMLInputElement>): void {
     const { files } = event.target;
     if (files !== null) {
       const file = files[0];
@@ -422,25 +421,25 @@ export default class App extends React.Component<{}, State> {
             Option.some({ r: 0, g: 0, b: 0, a: 0 })
           ),
           isAdjustingPreviousFill: false,
-          pendingFillUpdate: Option.none()
+          pendingFillUpdate: Option.none(),
         });
 
-        readFileAsHtmlImage(file).then(img => {
+        readFileAsHtmlImage(file).then((img) => {
           const imgDataAfterFill = getImgData(img);
           const snapshot: Snapshot = {
             fill: Option.none(),
-            imgDataAfterFill
+            imgDataAfterFill,
           };
 
           this.setState({
-            history: Option.some(History.fromCurrent(snapshot))
+            history: Option.some(History.fromCurrent(snapshot)),
           });
         });
       }
     }
   }
 
-  onReplacementColorChangeComplete(color: ColorResult) {
+  onReplacementColorChangeComplete(color: ColorResult): void {
     const replacementColor = getRgbaU8FromRgb(color.rgb);
     this.setState({ replacementColor: Option.some(replacementColor) });
 
@@ -449,11 +448,11 @@ export default class App extends React.Component<{}, State> {
     }
   }
 
-  onCanvasClick(event: React.MouseEvent<HTMLCanvasElement>) {
+  onCanvasClick(event: React.MouseEvent<HTMLCanvasElement>): void {
     Option.all([
       this.state.replacementColor,
       this.state.history,
-      this.state.history.andThen(history => history.current())
+      this.state.history.andThen((history) => history.current()),
     ]).ifSome(([replacementColor, history, currentSnapshot]) => {
       const { clientX, clientY } = event;
       const canvas = this.mainCanvasRef.current!;
@@ -493,17 +492,17 @@ export default class App extends React.Component<{}, State> {
         } else {
           const colorComparisonOptions: ColorComparisonOptions = {
             tolerance: parseInt(this.state.toleranceStr, 10),
-            shouldCompareAlpha: this.state.shouldCompareAlpha
+            shouldCompareAlpha: this.state.shouldCompareAlpha,
           };
           const fill: Fill = {
             startLocation,
             replacementColor,
-            colorComparisonOptions
+            colorComparisonOptions,
           };
           const imgDataAfterFill = getImgDataAfterFloodFill(dataBefore, fill);
           const newSnapshot: Snapshot = {
             fill: Option.some(fill),
-            imgDataAfterFill
+            imgDataAfterFill,
           };
 
           history.push(newSnapshot);
@@ -513,53 +512,53 @@ export default class App extends React.Component<{}, State> {
     });
   }
 
-  onToleranceChange(event: React.ChangeEvent<HTMLInputElement>) {
+  onToleranceChange(event: React.ChangeEvent<HTMLInputElement>): void {
     const toleranceStr = event.target.value;
     this.setState({ toleranceStr });
 
     if (this.state.isAdjustingPreviousFill) {
       this.adjustPreviousFill({
-        colorComparisonOptions: { tolerance: parseInt(toleranceStr, 10) }
+        colorComparisonOptions: { tolerance: parseInt(toleranceStr, 10) },
       });
     }
   }
 
-  onShouldCompareAlphaChange(event: React.ChangeEvent<HTMLInputElement>) {
+  onShouldCompareAlphaChange(event: React.ChangeEvent<HTMLInputElement>): void {
     const shouldCompareAlpha = event.target.checked;
     this.setState({ shouldCompareAlpha });
 
     if (this.state.isAdjustingPreviousFill) {
       if (event.target.type === "slider") {
         this.debouncedAdjustPreviousFill({
-          colorComparisonOptions: { shouldCompareAlpha }
+          colorComparisonOptions: { shouldCompareAlpha },
         });
       } else {
         this.adjustPreviousFill({
-          colorComparisonOptions: { shouldCompareAlpha }
+          colorComparisonOptions: { shouldCompareAlpha },
         });
       }
     }
   }
 
-  debouncedAdjustPreviousFill(fillUpdate: FillUpdate) {
+  debouncedAdjustPreviousFill(fillUpdate: FillUpdate): void {
     this.state.pendingFillUpdate.ifNone(() => {
       this.setState({ pendingFillUpdate: Option.some(fillUpdate) });
       requestAnimationFrame(this.applyPendingFillUpdate);
     });
   }
 
-  applyPendingFillUpdate() {
-    this.state.pendingFillUpdate.ifSome(update => {
+  applyPendingFillUpdate(): void {
+    this.state.pendingFillUpdate.ifSome((update) => {
       this.clearPendingFillUpdate();
       this.adjustPreviousFill(update);
     });
   }
 
-  clearPendingFillUpdate() {
+  clearPendingFillUpdate(): void {
     this.setState({ pendingFillUpdate: Option.none() });
   }
 
-  adjustPreviousFill(fillUpdate: FillUpdate) {
+  adjustPreviousFill(fillUpdate: FillUpdate): void {
     // Prevent a pending update from overwriting this update in the future.
     this.clearPendingFillUpdate();
 
@@ -587,11 +586,11 @@ export default class App extends React.Component<{}, State> {
     this.forceUpdate();
   }
 
-  onUndoClick() {
+  onUndoClick(): void {
     this.undo();
   }
 
-  undo() {
+  undo(): void {
     this.state.history
       .expect("Cannot call onUndoClick if history is none")
       .undo();
@@ -600,11 +599,11 @@ export default class App extends React.Component<{}, State> {
     });
   }
 
-  onRedoClick() {
+  onRedoClick(): void {
     this.redo();
   }
 
-  redo() {
+  redo(): void {
     this.state.history
       .expect("Cannot call onRedoClick if history is none")
       .redo();
@@ -613,24 +612,24 @@ export default class App extends React.Component<{}, State> {
     });
   }
 
-  onBackdropColorChangeComplete(color: ColorResult) {
+  onBackdropColorChangeComplete(color: ColorResult): void {
     this.setState({ backdropColorHex: color.hex });
   }
 
   onShouldBackdropBeCheckeredChange(
     event: React.ChangeEvent<HTMLInputElement>
-  ) {
+  ): void {
     this.setState({ shouldBackdropBeCheckered: event.target.checked });
   }
 
-  scrollHistoryToCurrentSnapshot() {
+  scrollHistoryToCurrentSnapshot(): void {
     const currentSnapshot = this.currentSnapshotRef.current;
     if (currentSnapshot !== null) {
       const snapshotsContainer = this.snapshotsRef.current!;
-      const snapshotsContainerWidth = snapshotsContainer.getBoundingClientRect()
-        .width;
-      const currentSnapshotRight = currentSnapshot.getBoundingClientRect()
-        .right;
+      const snapshotsContainerWidth =
+        snapshotsContainer.getBoundingClientRect().width;
+      const currentSnapshotRight =
+        currentSnapshot.getBoundingClientRect().right;
       snapshotsContainer.scroll(
         currentSnapshotRight +
           snapshotsContainer.scrollLeft -
@@ -640,18 +639,19 @@ export default class App extends React.Component<{}, State> {
     }
   }
 
-  onStopAdjustingPreviousFillClick() {
+  onStopAdjustingPreviousFillClick(): void {
     this.setState({ isAdjustingPreviousFill: false });
   }
 
-  onAdjustPreviousFillClick() {
+  onAdjustPreviousFillClick(): void {
     this.setState({ isAdjustingPreviousFill: true });
   }
+
   onIsSelectingReplacementColorFromCurrentSnapshotChange(
     event: React.ChangeEvent<HTMLInputElement>
-  ) {
+  ): void {
     this.setState({
-      isSelectingReplacementColorFromCurrentSnapshot: event.target.checked
+      isSelectingReplacementColorFromCurrentSnapshot: event.target.checked,
     });
   }
 }
@@ -686,8 +686,8 @@ function applyFillUpdate(prevFill: Fill, update: FillUpdate): Fill {
       shouldCompareAlpha:
         newShouldCompareAlpha !== undefined
           ? newShouldCompareAlpha
-          : prevFill.colorComparisonOptions.shouldCompareAlpha
-    }
+          : prevFill.colorComparisonOptions.shouldCompareAlpha,
+    },
   };
 }
 

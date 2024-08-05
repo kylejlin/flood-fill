@@ -9,7 +9,7 @@ export default class Canvas extends React.Component<Props> {
     this.canvasRef = props.canvasRef || React.createRef();
   }
 
-  render() {
+  render(): React.ReactElement {
     const { imgData } = this.props;
     return (
       <canvas
@@ -21,15 +21,15 @@ export default class Canvas extends React.Component<Props> {
     );
   }
 
-  componentDidMount() {
+  componentDidMount(): void {
     this.renderImgData();
   }
 
-  componentDidUpdate() {
+  componentDidUpdate(): void {
     this.renderImgData();
   }
 
-  renderImgData() {
+  renderImgData(): void {
     const canvas = this.canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
     ctx.putImageData(this.props.imgData, 0, 0);
@@ -46,7 +46,7 @@ function omitNonNormalProps(
 ): React.CanvasHTMLAttributes<HTMLCanvasElement> {
   const clone = { ...props };
 
-  delete clone.imgData;
+  delete (clone as any).imgData;
   delete clone.canvasRef;
 
   return clone;

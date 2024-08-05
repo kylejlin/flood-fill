@@ -16,13 +16,8 @@ export function getImgDataAfterFloodFill(
   originalData: ImageData,
   fill: Fill
 ): ImageData {
-  const {
-    startLocation,
-    replacementColor: replacementRgbColor,
-    colorComparisonOptions
-  } = fill;
+  const { startLocation, replacementColor, colorComparisonOptions } = fill;
   const newData = cloneImgData(originalData);
-  const replacementColor = getRgbaU8FromRgb(replacementRgbColor);
   const targetColor = getPixelColorAt(newData, startLocation);
   const isColorCloseEnoughToTarget = getColorComparator(
     targetColor,
@@ -42,7 +37,7 @@ export function getImgDataAfterFloodFill(
 
   while (queue.hasItem()) {
     const location = queue.dequeue();
-    getWestNeighbor(location).ifSome(neighbor => {
+    getWestNeighbor(location).ifSome((neighbor) => {
       const neighborColor = getPixelColorAt(newData, neighbor);
       if (
         isColorCloseEnoughToTarget(neighborColor) &&
@@ -52,7 +47,7 @@ export function getImgDataAfterFloodFill(
         queue.enqueue(neighbor);
       }
     });
-    getNorthNeighbor(location).ifSome(neighbor => {
+    getNorthNeighbor(location).ifSome((neighbor) => {
       const neighborColor = getPixelColorAt(newData, neighbor);
       if (
         isColorCloseEnoughToTarget(neighborColor) &&
@@ -62,7 +57,7 @@ export function getImgDataAfterFloodFill(
         queue.enqueue(neighbor);
       }
     });
-    getEastNeighbor(location, imgWidth).ifSome(neighbor => {
+    getEastNeighbor(location, imgWidth).ifSome((neighbor) => {
       const neighborColor = getPixelColorAt(newData, neighbor);
       if (
         isColorCloseEnoughToTarget(neighborColor) &&
@@ -72,7 +67,7 @@ export function getImgDataAfterFloodFill(
         queue.enqueue(neighbor);
       }
     });
-    getSouthNeighbor(location, imgHeight).ifSome(neighbor => {
+    getSouthNeighbor(location, imgHeight).ifSome((neighbor) => {
       const neighborColor = getPixelColorAt(newData, neighbor);
       if (
         isColorCloseEnoughToTarget(neighborColor) &&
@@ -96,7 +91,7 @@ export function getRgbaU8FromRgb(rgb: RGBColor): RgbaU8 {
     r: rgb.r,
     g: rgb.g,
     b: rgb.b,
-    a: Math.floor(255 * (rgb.a === undefined ? 1.0 : rgb.a))
+    a: Math.floor(255 * (rgb.a === undefined ? 1.0 : rgb.a)),
   };
 }
 
@@ -170,7 +165,7 @@ function writePixel(
 
 function getWestNeighbor({
   x,
-  y
+  y,
 }: {
   x: number;
   y: number;
@@ -184,7 +179,7 @@ function getWestNeighbor({
 
 function getNorthNeighbor({
   x,
-  y
+  y,
 }: {
   x: number;
   y: number;
@@ -199,7 +194,7 @@ function getNorthNeighbor({
 function getEastNeighbor(
   {
     x,
-    y
+    y,
   }: {
     x: number;
     y: number;
@@ -216,7 +211,7 @@ function getEastNeighbor(
 function getSouthNeighbor(
   {
     x,
-    y
+    y,
   }: {
     x: number;
     y: number;

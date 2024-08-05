@@ -1,5 +1,4 @@
 import Option from "@kylejlin/option";
-import { RGBColor } from "react-color";
 
 export interface RgbaU8 {
   r: number;
@@ -15,7 +14,7 @@ export interface ColorComparisonOptions {
 
 export interface Fill {
   startLocation: { x: number; y: number };
-  replacementColor: RGBColor;
+  replacementColor: RgbaU8;
   colorComparisonOptions: ColorComparisonOptions;
 }
 
@@ -110,7 +109,7 @@ export class History<T> {
     return this.redoStack.length > 0;
   }
 
-  push(item: T) {
+  push(item: T): void {
     this.undoStack.push(item);
     this.redoStack = [];
   }
