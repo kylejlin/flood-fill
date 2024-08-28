@@ -34,39 +34,6 @@ export interface MutableSnapshot {
   imgDataAfterFill: ImageData;
 }
 
-export class Queue<T> {
-  private data: (T | undefined)[];
-  private dequeueIndex: number;
-
-  static empty<T>(): Queue<T> {
-    return new Queue([]);
-  }
-
-  private constructor(data: T[]) {
-    this.data = data;
-    this.dequeueIndex = 0;
-  }
-
-  enqueue(item: T): void {
-    this.data.push(item);
-  }
-
-  dequeue(): T {
-    if (this.hasItem()) {
-      const item = this.data[this.dequeueIndex];
-      this.data[this.dequeueIndex] = undefined;
-      this.dequeueIndex++;
-      return item!;
-    } else {
-      throw new Error("Cannot dequeue an item from an empty queue.");
-    }
-  }
-
-  hasItem(): boolean {
-    return this.dequeueIndex < this.data.length;
-  }
-}
-
 export class History<T> {
   private undoStack: T[];
   private redoStack: T[];

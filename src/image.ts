@@ -1,7 +1,8 @@
-import Option from "@kylejlin/option";
 import { RGBColor } from "react-color";
 
-import { ColorComparisonOptions, Queue, RgbaU8, Fill } from "./types";
+import { ColorComparisonOptions, RgbaU8, Fill } from "./types";
+
+let queue = new Uint32Array(3);
 
 export function getImgData(img: HTMLImageElement): ImageData {
   const canvas = document.createElement("canvas");
@@ -12,74 +13,195 @@ export function getImgData(img: HTMLImageElement): ImageData {
   return ctx.getImageData(0, 0, canvas.width, canvas.height);
 }
 
-export function getImgDataAfterFloodFill(
-  originalData: ImageData,
+export function applyFloodFillInPlace(
+  imgData: ImageData,
   fill: Fill
 ): ImageData {
+  const { width, height, data: imgDataBytes } = imgData;
   const { startLocation, replacementColor, colorComparisonOptions } = fill;
-  const newData = cloneImgData(originalData);
-  const targetColor = getPixelColorAt(newData, startLocation);
+  const startLocationAsByteIndex =
+    4 * (startLocation.y * width + startLocation.x);
   const isColorCloseEnoughToTarget = getColorComparator(
-    targetColor,
-    colorComparisonOptions
+    {
+      r: imgDataBytes[startLocationAsByteIndex],
+      g: imgDataBytes[startLocationAsByteIndex + 1],
+      b: imgDataBytes[startLocationAsByteIndex + 2],
+      a: imgDataBytes[startLocationAsByteIndex + 3],
+    },
+    colorComparisonOptions,
+    imgDataBytes
+  );
+  const isColorSameAsReplacementColor = getColorEqualityChecker(
+    replacementColor,
+    imgDataBytes
   );
 
-  if (areColorsEqual(replacementColor, targetColor)) {
-    return newData;
+  if (
+    replacementColor.r === imgDataBytes[startLocationAsByteIndex] &&
+    replacementColor.g === imgDataBytes[startLocationAsByteIndex + 1] &&
+    replacementColor.b === imgDataBytes[startLocationAsByteIndex + 2] &&
+    replacementColor.a === imgDataBytes[startLocationAsByteIndex + 3]
+  ) {
+    return imgData;
   }
 
-  const { width: imgWidth, height: imgHeight } = originalData;
+  const widthTimes4 = width * 4;
+  const widthMinus1 = width - 1;
+  const heightMinus1 = height - 1;
 
-  writePixel(newData, startLocation, replacementColor);
+  const replacementColorR = replacementColor.r;
+  const replacementColorG = replacementColor.g;
+  const replacementColorB = replacementColor.b;
+  const replacementColorA = replacementColor.a;
+  imgDataBytes[startLocationAsByteIndex] = replacementColorR;
+  imgDataBytes[startLocationAsByteIndex + 1] = replacementColorG;
+  imgDataBytes[startLocationAsByteIndex + 2] = replacementColorB;
+  imgDataBytes[startLocationAsByteIndex + 3] = replacementColorA;
 
-  const queue: Queue<{ x: number; y: number }> = Queue.empty();
-  queue.enqueue(startLocation);
+  queue.set([startLocation.x, startLocation.y, startLocationAsByteIndex]);
+  let dequeueIndex = 0;
+  /**
+   * This equals one plus the last index in the queue.
+   * For example, if the queue has 3 items, then the last index
+   * is `2`, which means `queueEndIndex` is `3`.
+   */
+  let queueEndIndex = 3;
 
-  while (queue.hasItem()) {
-    const location = queue.dequeue();
-    getWestNeighbor(location).ifSome((neighbor) => {
-      const neighborColor = getPixelColorAt(newData, neighbor);
-      if (
-        isColorCloseEnoughToTarget(neighborColor) &&
-        !areColorsEqual(replacementColor, neighborColor)
-      ) {
-        writePixel(newData, neighbor, replacementColor);
-        queue.enqueue(neighbor);
-      }
-    });
-    getNorthNeighbor(location).ifSome((neighbor) => {
-      const neighborColor = getPixelColorAt(newData, neighbor);
-      if (
-        isColorCloseEnoughToTarget(neighborColor) &&
-        !areColorsEqual(replacementColor, neighborColor)
-      ) {
-        writePixel(newData, neighbor, replacementColor);
-        queue.enqueue(neighbor);
-      }
-    });
-    getEastNeighbor(location, imgWidth).ifSome((neighbor) => {
-      const neighborColor = getPixelColorAt(newData, neighbor);
-      if (
-        isColorCloseEnoughToTarget(neighborColor) &&
-        !areColorsEqual(replacementColor, neighborColor)
-      ) {
-        writePixel(newData, neighbor, replacementColor);
-        queue.enqueue(neighbor);
-      }
-    });
-    getSouthNeighbor(location, imgHeight).ifSome((neighbor) => {
-      const neighborColor = getPixelColorAt(newData, neighbor);
-      if (
-        isColorCloseEnoughToTarget(neighborColor) &&
-        !areColorsEqual(replacementColor, neighborColor)
-      ) {
-        writePixel(newData, neighbor, replacementColor);
-        queue.enqueue(neighbor);
-      }
-    });
+  function enqueue(x: number, y: number, byteIndex: number): void {
+    let remainingSpace = queue.length - queueEndIndex;
+
+    if (remainingSpace >= 3) {
+      queue[queueEndIndex] = x;
+      queue[queueEndIndex + 1] = y;
+      queue[queueEndIndex + 2] = byteIndex;
+      queueEndIndex += 3;
+      return;
+    }
+
+    const newQueue = new Uint32Array(2 * queue.length);
+    newQueue.set(queue.subarray(dequeueIndex, queueEndIndex));
+    queueEndIndex -= dequeueIndex;
+    dequeueIndex = 0;
+    queue = newQueue;
+
+    queue[queueEndIndex] = x;
+    queue[queueEndIndex + 1] = y;
+    queue[queueEndIndex + 2] = byteIndex;
+    queueEndIndex += 3;
   }
 
-  return newData;
+  while (dequeueIndex < queueEndIndex) {
+    const x = queue[dequeueIndex];
+    const y = queue[dequeueIndex + 1];
+    const byteIndex = queue[dequeueIndex + 2];
+    dequeueIndex += 3;
+
+    // West neighbor
+    if (
+      x > 0 &&
+      isColorCloseEnoughToTarget(byteIndex - 4) &&
+      !isColorSameAsReplacementColor(byteIndex - 4)
+    ) {
+      const neighborByteIndex = byteIndex - 4;
+      imgDataBytes[neighborByteIndex] = replacementColorR;
+      imgDataBytes[neighborByteIndex + 1] = replacementColorG;
+      imgDataBytes[neighborByteIndex + 2] = replacementColorB;
+      imgDataBytes[neighborByteIndex + 3] = replacementColorA;
+
+      enqueue(x - 1, y, neighborByteIndex);
+    }
+
+    // North neighbor
+    if (
+      y > 0 &&
+      isColorCloseEnoughToTarget(byteIndex - widthTimes4) &&
+      !isColorSameAsReplacementColor(byteIndex - widthTimes4)
+    ) {
+      const neighborByteIndex = byteIndex - widthTimes4;
+      imgDataBytes[neighborByteIndex] = replacementColorR;
+      imgDataBytes[neighborByteIndex + 1] = replacementColorG;
+      imgDataBytes[neighborByteIndex + 2] = replacementColorB;
+      imgDataBytes[neighborByteIndex + 3] = replacementColorA;
+
+      enqueue(x, y - 1, neighborByteIndex);
+    }
+
+    // East neighbor
+    if (
+      x < widthMinus1 &&
+      isColorCloseEnoughToTarget(byteIndex + 4) &&
+      !isColorSameAsReplacementColor(byteIndex + 4)
+    ) {
+      const neighborByteIndex = byteIndex + 4;
+      imgDataBytes[neighborByteIndex] = replacementColorR;
+      imgDataBytes[neighborByteIndex + 1] = replacementColorG;
+      imgDataBytes[neighborByteIndex + 2] = replacementColorB;
+      imgDataBytes[neighborByteIndex + 3] = replacementColorA;
+
+      enqueue(x + 1, y, neighborByteIndex);
+    }
+
+    // South neighbor
+    if (
+      y < heightMinus1 &&
+      isColorCloseEnoughToTarget(byteIndex + widthTimes4) &&
+      !isColorSameAsReplacementColor(byteIndex + widthTimes4)
+    ) {
+      const neighborByteIndex = byteIndex + widthTimes4;
+      imgDataBytes[neighborByteIndex] = replacementColorR;
+      imgDataBytes[neighborByteIndex + 1] = replacementColorG;
+      imgDataBytes[neighborByteIndex + 2] = replacementColorB;
+      imgDataBytes[neighborByteIndex + 3] = replacementColorA;
+
+      enqueue(x, y + 1, neighborByteIndex);
+    }
+  }
+
+  return imgData;
+}
+
+function getColorComparator(
+  lhs: RgbaU8,
+  options: ColorComparisonOptions,
+  imgDataBytes: Uint8ClampedArray
+): (index: number) => boolean {
+  const { tolerance, shouldCompareAlpha } = options;
+  const tolSq = tolerance * tolerance;
+  const { r, g, b, a } = lhs;
+
+  if (shouldCompareAlpha) {
+    return function isColorCloseEnoughToTarget(index: number): boolean {
+      const dr = r - imgDataBytes[index];
+      const dg = g - imgDataBytes[index + 1];
+      const db = b - imgDataBytes[index + 2];
+      const da = a - imgDataBytes[index + 3];
+      const distSq = dr * dr + dg * dg + db * db + da * da;
+      return distSq <= tolSq;
+    };
+  } else {
+    return function isColorCloseEnoughToTarget(index: number): boolean {
+      const dr = r - imgDataBytes[index];
+      const dg = g - imgDataBytes[index + 1];
+      const db = b - imgDataBytes[index + 2];
+      const distSq = dr * dr + dg * dg + db * db;
+      return distSq <= tolSq;
+    };
+  }
+}
+
+function getColorEqualityChecker(
+  lhs: RgbaU8,
+  imgDataBytes: Uint8ClampedArray
+): (index: number) => boolean {
+  const { r, g, b, a } = lhs;
+  return function isColorCloseEnoughToTarget(index: number): boolean {
+    return (
+      r === imgDataBytes[index] &&
+      g === imgDataBytes[index + 1] &&
+      b === imgDataBytes[index + 2] &&
+      a === imgDataBytes[index + 3]
+    );
+  };
 }
 
 export function cloneImgData(original: ImageData): ImageData {
@@ -112,117 +234,6 @@ export function getPixelColorAt(
   return { r: data[i], g: data[i + 1], b: data[i + 2], a: data[i + 3] };
 }
 
-function getColorComparator(
-  targetColor: RgbaU8,
-  options: ColorComparisonOptions
-): (color: RgbaU8) => boolean {
-  const { tolerance, shouldCompareAlpha } = options;
-  const tolSq = tolerance * tolerance;
-
-  if (shouldCompareAlpha) {
-    return function isColorCloseEnoughToTarget(color: RgbaU8): boolean {
-      const dr = targetColor.r - color.r;
-      const dg = targetColor.g - color.g;
-      const db = targetColor.b - color.b;
-      const da = targetColor.a - color.a;
-      const distSq = dr * dr + dg * dg + db * db + da * da;
-      return distSq <= tolSq;
-    };
-  } else {
-    return function isColorCloseEnoughToTarget(color: RgbaU8): boolean {
-      const dr = targetColor.r - color.r;
-      const dg = targetColor.g - color.g;
-      const db = targetColor.b - color.b;
-      const distSq = dr * dr + dg * dg + db * db;
-      return distSq <= tolSq;
-    };
-  }
-}
-
 export function areColorsEqual(c1: RgbaU8, c2: RgbaU8): boolean {
   return c1.r === c2.r && c1.g === c2.g && c1.b === c2.b && c1.a === c2.a;
-}
-
-function writePixel(
-  imgData: ImageData,
-  { x, y }: { x: number; y: number },
-  color: RgbaU8
-): void {
-  const { width, height, data } = imgData;
-
-  if (x >= width) {
-    throw new RangeError("X coordinate exceeded image width.");
-  }
-  if (y >= height) {
-    throw new RangeError("Y coordinate exceeded image height.");
-  }
-
-  const i = 4 * (y * width + x);
-
-  data[i] = color.r;
-  data[i + 1] = color.g;
-  data[i + 2] = color.b;
-  data[i + 3] = color.a;
-}
-
-function getWestNeighbor({
-  x,
-  y,
-}: {
-  x: number;
-  y: number;
-}): Option<{ x: number; y: number }> {
-  if (x > 0) {
-    return Option.some({ x: x - 1, y });
-  } else {
-    return Option.none();
-  }
-}
-
-function getNorthNeighbor({
-  x,
-  y,
-}: {
-  x: number;
-  y: number;
-}): Option<{ x: number; y: number }> {
-  if (y > 0) {
-    return Option.some({ x, y: y - 1 });
-  } else {
-    return Option.none();
-  }
-}
-
-function getEastNeighbor(
-  {
-    x,
-    y,
-  }: {
-    x: number;
-    y: number;
-  },
-  width: number
-): Option<{ x: number; y: number }> {
-  if (x < width - 1) {
-    return Option.some({ x: x + 1, y });
-  } else {
-    return Option.none();
-  }
-}
-
-function getSouthNeighbor(
-  {
-    x,
-    y,
-  }: {
-    x: number;
-    y: number;
-  },
-  height: number
-): Option<{ x: number; y: number }> {
-  if (y < height - 1) {
-    return Option.some({ x, y: y + 1 });
-  } else {
-    return Option.none();
-  }
 }

@@ -22,8 +22,8 @@ import {
   getRgbaU8FromRgb,
   areColorsEqual,
   cloneImgData,
+  applyFloodFillInPlace,
 } from "./image";
-import { applyFloodFillInPlace } from "./lab";
 
 export default class App extends React.Component<{}, State> {
   private mainCanvasRef: React.RefObject<HTMLCanvasElement>;
