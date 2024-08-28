@@ -672,23 +672,16 @@ interface State {
 }
 
 function applyFillUpdate(prevFill: Fill, update: FillUpdate): Fill {
-  const newTolerance =
-    update.colorComparisonOptions && update.colorComparisonOptions.tolerance;
-  const newShouldCompareAlpha =
-    update.colorComparisonOptions &&
-    update.colorComparisonOptions.shouldCompareAlpha;
   return {
-    startLocation: update.startLocation || prevFill.startLocation,
-    replacementColor: update.replacementColor || prevFill.replacementColor,
+    startLocation: update.startLocation ?? prevFill.startLocation,
+    replacementColor: update.replacementColor ?? prevFill.replacementColor,
     colorComparisonOptions: {
       tolerance:
-        newTolerance !== undefined
-          ? newTolerance
-          : prevFill.colorComparisonOptions.tolerance,
+        update.colorComparisonOptions?.tolerance ??
+        prevFill.colorComparisonOptions.tolerance,
       shouldCompareAlpha:
-        newShouldCompareAlpha !== undefined
-          ? newShouldCompareAlpha
-          : prevFill.colorComparisonOptions.shouldCompareAlpha,
+        update.colorComparisonOptions?.shouldCompareAlpha ??
+        prevFill.colorComparisonOptions.shouldCompareAlpha,
     },
   };
 }

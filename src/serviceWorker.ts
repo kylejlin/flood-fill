@@ -73,7 +73,7 @@ function registerValidSW(swUrl: string, config?: Config): void {
         }
         installingWorker.onstatechange = (): void => {
           if (installingWorker.state === "installed") {
-            if (navigator.serviceWorker.controller) {
+            if (navigator.serviceWorker.controller !== null) {
               // At this point, the updated precached content has been fetched,
               // but the previous service worker will still serve the older
               // content until all client tabs are closed.
@@ -83,7 +83,7 @@ function registerValidSW(swUrl: string, config?: Config): void {
               );
 
               // Execute callback
-              if (config && config.onUpdate) {
+              if (config !== undefined && config.onUpdate !== undefined) {
                 config.onUpdate(registration);
               }
             } else {
@@ -93,7 +93,7 @@ function registerValidSW(swUrl: string, config?: Config): void {
               console.log("Content is cached for offline use.");
 
               // Execute callback
-              if (config && config.onSuccess) {
+              if (config !== undefined && config.onSuccess !== undefined) {
                 config.onSuccess(registration);
               }
             }
