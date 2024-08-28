@@ -1,30 +1,35 @@
 import Option from "@kylejlin/option";
 
 export interface RgbaU8 {
-  r: number;
-  b: number;
-  g: number;
-  a: number;
+  readonly r: number;
+  readonly b: number;
+  readonly g: number;
+  readonly a: number;
 }
 
 export interface ColorComparisonOptions {
-  tolerance: number;
-  shouldCompareAlpha: boolean;
+  readonly tolerance: number;
+  readonly shouldCompareAlpha: boolean;
 }
 
 export interface Fill {
-  startLocation: { x: number; y: number };
-  replacementColor: RgbaU8;
-  colorComparisonOptions: ColorComparisonOptions;
+  readonly startLocation: Vec2;
+  readonly replacementColor: RgbaU8;
+  readonly colorComparisonOptions: ColorComparisonOptions;
+}
+
+export interface Vec2 {
+  readonly x: number;
+  readonly y: number;
 }
 
 export interface FillUpdate {
-  startLocation?: Fill["startLocation"];
-  replacementColor?: Fill["replacementColor"];
-  colorComparisonOptions?: Partial<Fill["colorComparisonOptions"]>;
+  readonly startLocation?: Fill["startLocation"];
+  readonly replacementColor?: Fill["replacementColor"];
+  readonly colorComparisonOptions?: Partial<Fill["colorComparisonOptions"]>;
 }
 
-export interface Snapshot {
+export interface MutableSnapshot {
   fill: Option<Fill>;
   imgDataAfterFill: ImageData;
 }

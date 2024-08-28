@@ -8,7 +8,7 @@ import Canvas from "./components/Canvas";
 
 import {
   History,
-  Snapshot,
+  MutableSnapshot,
   Fill,
   ColorComparisonOptions,
   FillUpdate,
@@ -426,7 +426,7 @@ export default class App extends React.Component<{}, State> {
 
         readFileAsHtmlImage(file).then((img) => {
           const imgDataAfterFill = getImgData(img);
-          const snapshot: Snapshot = {
+          const snapshot: MutableSnapshot = {
             fill: Option.none(),
             imgDataAfterFill,
           };
@@ -503,7 +503,7 @@ export default class App extends React.Component<{}, State> {
             dataBefore,
             fill
           );
-          const newSnapshot: Snapshot = {
+          const newSnapshot: MutableSnapshot = {
             fill: Option.some(fill),
             imgDataAfterFill,
           };
@@ -663,7 +663,7 @@ interface State {
   fileName: Option<string>;
   shouldBackdropBeCheckered: boolean;
   backdropColorHex: string;
-  history: Option<History<Snapshot>>;
+  history: Option<History<MutableSnapshot>>;
   replacementColor: Option<RgbaU8>;
   toleranceStr: string;
   shouldCompareAlpha: boolean;
