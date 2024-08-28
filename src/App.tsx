@@ -18,11 +18,11 @@ import {
 import readFileAsHtmlImage from "./readFileAsHtmlImage";
 import {
   getImgData,
-  getImgDataAfterFloodFill,
   getPixelColorAt,
   getRgbaU8FromRgb,
   areColorsEqual,
 } from "./image";
+import { getImgDataAfterFloodFill_experimental } from "./lab";
 
 export default class App extends React.Component<{}, State> {
   private mainCanvasRef: React.RefObject<HTMLCanvasElement>;
@@ -499,7 +499,10 @@ export default class App extends React.Component<{}, State> {
             replacementColor,
             colorComparisonOptions,
           };
-          const imgDataAfterFill = getImgDataAfterFloodFill(dataBefore, fill);
+          const imgDataAfterFill = getImgDataAfterFloodFill_experimental(
+            dataBefore,
+            fill
+          );
           const newSnapshot: Snapshot = {
             fill: Option.some(fill),
             imgDataAfterFill,
@@ -579,7 +582,7 @@ export default class App extends React.Component<{}, State> {
     const updatedFill = applyFillUpdate(previousFill, fillUpdate);
 
     currentSnapshot.fill = Option.some(updatedFill);
-    currentSnapshot.imgDataAfterFill = getImgDataAfterFloodFill(
+    currentSnapshot.imgDataAfterFill = getImgDataAfterFloodFill_experimental(
       previousSnapshot.imgDataAfterFill,
       updatedFill
     );
