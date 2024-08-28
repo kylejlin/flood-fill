@@ -82,8 +82,10 @@ export function getImgDataAfterFloodFill(
   return newData;
 }
 
-function cloneImgData(original: ImageData): ImageData {
-  return new ImageData(original.data.slice(), original.width, original.height);
+export function cloneImgData(original: ImageData): ImageData {
+  return new ImageData(original.data.slice(), original.width, original.height, {
+    colorSpace: original.colorSpace,
+  });
 }
 
 export function getRgbaU8FromRgb(rgb: RGBColor): RgbaU8 {

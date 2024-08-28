@@ -21,8 +21,9 @@ import {
   getPixelColorAt,
   getRgbaU8FromRgb,
   areColorsEqual,
+  cloneImgData,
 } from "./image";
-import { getImgDataAfterFloodFill_experimental } from "./lab";
+import { applyFloodFillInPlace } from "./lab";
 
 export default class App extends React.Component<{}, State> {
   private mainCanvasRef: React.RefObject<HTMLCanvasElement>;
@@ -499,10 +500,8 @@ export default class App extends React.Component<{}, State> {
             replacementColor,
             colorComparisonOptions,
           };
-          const imgDataAfterFill = getImgDataAfterFloodFill_experimental(
-            dataBefore,
-            fill
-          );
+          const imgDataAfterFill = cloneImgData(dataBefore);
+          applyFloodFillInPlace(imgDataAfterFill, fill);
           const newSnapshot: MutableSnapshot = {
             fill: Option.some(fill),
             imgDataAfterFill,
@@ -582,10 +581,10 @@ export default class App extends React.Component<{}, State> {
     const updatedFill = applyFillUpdate(previousFill, fillUpdate);
 
     currentSnapshot.fill = Option.some(updatedFill);
-    currentSnapshot.imgDataAfterFill = getImgDataAfterFloodFill_experimental(
-      previousSnapshot.imgDataAfterFill,
-      updatedFill
+    currentSnapshot.imgDataAfterFill.data.set(
+      previousSnapshot.imgDataAfterFill.data
     );
+    applyFloodFillInPlace(currentSnapshot.imgDataAfterFill, updatedFill);
     this.forceUpdate();
   }
 

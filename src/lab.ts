@@ -2,38 +2,36 @@ import { Fill, ColorComparisonOptions, RgbaU8 } from "./types";
 
 let queue = new Uint32Array(3);
 
-export function getImgDataAfterFloodFill_experimental(
-  originalData: ImageData,
+export function applyFloodFillInPlace(
+  imgData: ImageData,
   fill: Fill
 ): ImageData {
-  const { width, height } = originalData;
+  const { width, height, data: imgDataBytes } = imgData;
   const { startLocation, replacementColor, colorComparisonOptions } = fill;
-  const newData = cloneImgData(originalData);
-  const newDataBytes = newData.data;
   const startLocationAsByteIndex =
     4 * (startLocation.y * width + startLocation.x);
   const isColorCloseEnoughToTarget = getColorComparator(
     {
-      r: newDataBytes[startLocationAsByteIndex],
-      g: newDataBytes[startLocationAsByteIndex + 1],
-      b: newDataBytes[startLocationAsByteIndex + 2],
-      a: newDataBytes[startLocationAsByteIndex + 3],
+      r: imgDataBytes[startLocationAsByteIndex],
+      g: imgDataBytes[startLocationAsByteIndex + 1],
+      b: imgDataBytes[startLocationAsByteIndex + 2],
+      a: imgDataBytes[startLocationAsByteIndex + 3],
     },
     colorComparisonOptions,
-    newDataBytes
+    imgDataBytes
   );
   const isColorSameAsReplacementColor = getColorEqualityChecker(
     replacementColor,
-    newDataBytes
+    imgDataBytes
   );
 
   if (
-    replacementColor.r === newDataBytes[startLocationAsByteIndex] &&
-    replacementColor.g === newDataBytes[startLocationAsByteIndex + 1] &&
-    replacementColor.b === newDataBytes[startLocationAsByteIndex + 2] &&
-    replacementColor.a === newDataBytes[startLocationAsByteIndex + 3]
+    replacementColor.r === imgDataBytes[startLocationAsByteIndex] &&
+    replacementColor.g === imgDataBytes[startLocationAsByteIndex + 1] &&
+    replacementColor.b === imgDataBytes[startLocationAsByteIndex + 2] &&
+    replacementColor.a === imgDataBytes[startLocationAsByteIndex + 3]
   ) {
-    return newData;
+    return imgData;
   }
 
   const widthTimes4 = width * 4;
@@ -44,10 +42,10 @@ export function getImgDataAfterFloodFill_experimental(
   const replacementColorG = replacementColor.g;
   const replacementColorB = replacementColor.b;
   const replacementColorA = replacementColor.a;
-  newDataBytes[startLocationAsByteIndex] = replacementColorR;
-  newDataBytes[startLocationAsByteIndex + 1] = replacementColorG;
-  newDataBytes[startLocationAsByteIndex + 2] = replacementColorB;
-  newDataBytes[startLocationAsByteIndex + 3] = replacementColorA;
+  imgDataBytes[startLocationAsByteIndex] = replacementColorR;
+  imgDataBytes[startLocationAsByteIndex + 1] = replacementColorG;
+  imgDataBytes[startLocationAsByteIndex + 2] = replacementColorB;
+  imgDataBytes[startLocationAsByteIndex + 3] = replacementColorA;
 
   queue.set([startLocation.x, startLocation.y, startLocationAsByteIndex]);
   let dequeueIndex = 0;
@@ -94,10 +92,10 @@ export function getImgDataAfterFloodFill_experimental(
       !isColorSameAsReplacementColor(byteIndex - 4)
     ) {
       const neighborByteIndex = byteIndex - 4;
-      newDataBytes[neighborByteIndex] = replacementColorR;
-      newDataBytes[neighborByteIndex + 1] = replacementColorG;
-      newDataBytes[neighborByteIndex + 2] = replacementColorB;
-      newDataBytes[neighborByteIndex + 3] = replacementColorA;
+      imgDataBytes[neighborByteIndex] = replacementColorR;
+      imgDataBytes[neighborByteIndex + 1] = replacementColorG;
+      imgDataBytes[neighborByteIndex + 2] = replacementColorB;
+      imgDataBytes[neighborByteIndex + 3] = replacementColorA;
 
       enqueue(x - 1, y, neighborByteIndex);
     }
@@ -109,10 +107,10 @@ export function getImgDataAfterFloodFill_experimental(
       !isColorSameAsReplacementColor(byteIndex - widthTimes4)
     ) {
       const neighborByteIndex = byteIndex - widthTimes4;
-      newDataBytes[neighborByteIndex] = replacementColorR;
-      newDataBytes[neighborByteIndex + 1] = replacementColorG;
-      newDataBytes[neighborByteIndex + 2] = replacementColorB;
-      newDataBytes[neighborByteIndex + 3] = replacementColorA;
+      imgDataBytes[neighborByteIndex] = replacementColorR;
+      imgDataBytes[neighborByteIndex + 1] = replacementColorG;
+      imgDataBytes[neighborByteIndex + 2] = replacementColorB;
+      imgDataBytes[neighborByteIndex + 3] = replacementColorA;
 
       enqueue(x, y - 1, neighborByteIndex);
     }
@@ -124,10 +122,10 @@ export function getImgDataAfterFloodFill_experimental(
       !isColorSameAsReplacementColor(byteIndex + 4)
     ) {
       const neighborByteIndex = byteIndex + 4;
-      newDataBytes[neighborByteIndex] = replacementColorR;
-      newDataBytes[neighborByteIndex + 1] = replacementColorG;
-      newDataBytes[neighborByteIndex + 2] = replacementColorB;
-      newDataBytes[neighborByteIndex + 3] = replacementColorA;
+      imgDataBytes[neighborByteIndex] = replacementColorR;
+      imgDataBytes[neighborByteIndex + 1] = replacementColorG;
+      imgDataBytes[neighborByteIndex + 2] = replacementColorB;
+      imgDataBytes[neighborByteIndex + 3] = replacementColorA;
 
       enqueue(x + 1, y, neighborByteIndex);
     }
@@ -139,20 +137,16 @@ export function getImgDataAfterFloodFill_experimental(
       !isColorSameAsReplacementColor(byteIndex + widthTimes4)
     ) {
       const neighborByteIndex = byteIndex + widthTimes4;
-      newDataBytes[neighborByteIndex] = replacementColorR;
-      newDataBytes[neighborByteIndex + 1] = replacementColorG;
-      newDataBytes[neighborByteIndex + 2] = replacementColorB;
-      newDataBytes[neighborByteIndex + 3] = replacementColorA;
+      imgDataBytes[neighborByteIndex] = replacementColorR;
+      imgDataBytes[neighborByteIndex + 1] = replacementColorG;
+      imgDataBytes[neighborByteIndex + 2] = replacementColorB;
+      imgDataBytes[neighborByteIndex + 3] = replacementColorA;
 
       enqueue(x, y + 1, neighborByteIndex);
     }
   }
 
-  return newData;
-}
-
-function cloneImgData(original: ImageData): ImageData {
-  return new ImageData(original.data.slice(), original.width, original.height);
+  return imgData;
 }
 
 function getColorComparator(
