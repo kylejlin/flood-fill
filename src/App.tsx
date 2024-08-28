@@ -91,7 +91,7 @@ export default class App extends React.Component<{}, State> {
 
   onKeyDown(event: KeyboardEvent): void {
     if (
-      document.activeElement === document.body &&
+      isNotInputOrTextArea(document.activeElement) &&
       event.key.toLowerCase() === "z" &&
       (event.ctrlKey || event.metaKey) &&
       !this.state.isAdjustingPreviousFill
@@ -684,4 +684,12 @@ function getMaxEuclideanDistance(shouldCompareAlpha: boolean): number {
   } else {
     return Math.hypot(255, 255, 255);
   }
+}
+
+function isNotInputOrTextArea(element: null | Element): boolean {
+  if (element === null) {
+    return true;
+  }
+
+  return !["INPUT", "TEXTAREA"].includes(element.tagName);
 }
