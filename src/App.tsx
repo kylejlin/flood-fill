@@ -445,7 +445,7 @@ export default class App extends React.Component<{}, State> {
     this.setState({ replacementColor: Option.some(replacementColor) });
 
     if (this.state.isAdjustingPreviousFill) {
-      this.adjustPreviousFill({ replacementColor });
+      this.debouncedAdjustPreviousFill({ replacementColor });
     }
   }
 
@@ -519,7 +519,7 @@ export default class App extends React.Component<{}, State> {
     this.setState({ toleranceStr });
 
     if (this.state.isAdjustingPreviousFill) {
-      this.adjustPreviousFill({
+      this.debouncedAdjustPreviousFill({
         colorComparisonOptions: { tolerance: parseInt(toleranceStr, 10) },
       });
     }
@@ -530,39 +530,31 @@ export default class App extends React.Component<{}, State> {
     this.setState({ shouldCompareAlpha });
 
     if (this.state.isAdjustingPreviousFill) {
-      if (event.target.type === "slider") {
-        this.debouncedAdjustPreviousFill({
-          colorComparisonOptions: { shouldCompareAlpha },
-        });
-      } else {
-        this.adjustPreviousFill({
-          colorComparisonOptions: { shouldCompareAlpha },
-        });
-      }
+      this.debouncedAdjustPreviousFill({
+        colorComparisonOptions: { shouldCompareAlpha },
+      });
     }
   }
 
   debouncedAdjustPreviousFill(fillUpdate: FillUpdate): void {
     this.state.pendingFillUpdate.ifNone(() => {
-      this.setState({ pendingFillUpdate: Option.some(fillUpdate) });
-      requestAnimationFrame(this.applyPendingFillUpdate);
+      this.setState({ pendingFillUpdate: Option.some(fillUpdate) }, () => {
+        requestAnimationFrame(this.applyPendingFillUpdate);
+      });
     });
   }
 
   applyPendingFillUpdate(): void {
     this.state.pendingFillUpdate.ifSome((update) => {
-      this.clearPendingFillUpdate();
-      this.adjustPreviousFill(update);
+      this.setState({ pendingFillUpdate: Option.none() }, () => {
+        this.adjustPreviousFill(update);
+      });
     });
-  }
-
-  clearPendingFillUpdate(): void {
-    this.setState({ pendingFillUpdate: Option.none() });
   }
 
   adjustPreviousFill(fillUpdate: FillUpdate): void {
     // Prevent a pending update from overwriting this update in the future.
-    this.clearPendingFillUpdate();
+    (this.state as State).pendingFillUpdate = Option.none();
 
     const history = this.state.history.expect(
       "Cannot call adjustPreviousFill if there is no history"
